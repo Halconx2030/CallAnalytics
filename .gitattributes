@@ -1,0 +1,32 @@
+# Política de finales de línea: LF en repositorio (text=auto), binarios explícitos y lockfile de pnpm marcado como generado.
+* text=auto eol=lf
+
+# Binarios: Git no los normaliza ni los compara como texto.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.xlsx binary
+*.pdf binary
+
+# Scripts de Windows: CRLF obligatorio (aún no existe ninguno en el repo; quedan preparados).
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Código, datos y documentación: LF explícito.
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.sql text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+
+# pnpm-lock.yaml: fichero generado, fuera de diffs y de estadísticas de lenguaje.
+pnpm-lock.yaml text eol=lf linguist-generated=true -diff
