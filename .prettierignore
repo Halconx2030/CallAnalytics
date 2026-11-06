@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+pnpm-lock.yaml
+.opencode/node_modules/
+playwright-report/
+test-results/
+src/infrastructure/database/migrations/meta/
