@@ -778,3 +778,87 @@ Orden: **T-23** (hooks formatos) → **T-24** (panel formatos + unitario del hoo
 - RF-QUAL-1.13 … RF-QUAL-1.16 → E.2.4 (T-27…T-28)
 
 **Aprobación**: pendiente
+
+---
+
+## Plan del delta v1.4 — total_count en paginación por cursor (2026-11-06)
+
+**Base**: `spec.md` **v1.4** (borrador, delta v1.4 sobre v1.3, 104 RF: 94 existentes + RF-PAG-1.1…1.10). Este anexo añade las secciones §F.1 a §F.4 al plan original sin reescribirlas. **No hay migraciones ni cambios de esquema**: el delta extiende el contrato de paginación por cursor con `total_count` y su derivado en la UI (`totalPaginas`).
+
+### F.1 Objetivo y alcance
+
+- **(a) Contrato de dominio** — RF-PAG-1.1: el puerto `PaginaCursor<T>` (`src/application/ports/repositories/paginacion.ts`) añade el campo `totalCount: number` junto a `items`, `next_cursor` y `has_next_page`.
+- **(b) Contrato HTTP** — RF-PAG-1.2, RF-PAG-1.3, RF-PAG-1.5: `PaginaResponse<T>` (`src/infrastructure/http/respuestas.ts`) añade `total_count: number`; `toPaginaResponse()` lo incluye; `paginaSchema()` (`src/infrastructure/http/schemas/comunes.ts`) lo valida como entero ≥ 0.
+- **(c) Repositorios** — RF-PAG-1.4: `listar()` de los 3 repositorios (formatos, centros de coste, líneas) calcula `totalCount` con una consulta `SELECT COUNT(*)` separada, aplicando los mismos filtros que la consulta de datos (para líneas además `deleted_at IS NULL`), y **no** usa `COUNT(*) OVER()`.
+- **(d) SPA** — RF-PAG-1.6, RF-PAG-1.7, RF-PAG-1.8: `Pagina<T>` (`presentation/src/types/api.ts`) añade `totalCount: number`; los 3 paneles (Formatos, Centros de Coste y Líneas) calculan `totalPaginas = Math.ceil(totalCount / límite)` desde `pagina.totalCount` y nunca de `cursores.length`; `totalCount = 0` muestra "0 registros", nunca "Página 1 de 0", y `totalPaginas` está disponible desde el primer render.
+- **Fuera de alcance**: no se modifican ni renumeran los 94 RF existentes; no hay nueva migración; no se usa `COUNT(*) OVER()`; no se cambia el orden de paginación ni la columna del cursor.
+
+### F.2 Diseño técnico
+
+#### F.2.1 Arquitectura de capas y ubicación de cada cambio
+
+| Capa | Archivo | Cambio | RF |
+| ---- | ------- | ------ | -- |
+| Dominio / puerto | `src/application/ports/repositories/paginacion.ts` | `PaginaCursor<T>` añade `totalCount: number` | RF-PAG-1.1 |
+| HTTP — respuestas | `src/infrastructure/http/respuestas.ts` | `PaginaResponse<T>` añade `total_count`; `toPaginaResponse()` lo incluye | RF-PAG-1.2, RF-PAG-1.5 |
+| HTTP — validación | `src/infrastructure/http/schemas/comunes.ts` | `paginaSchema()` valida `total_count` (`z.number().int().nonnegative()`) | RF-PAG-1.3 |
+| Infraestructura DB | `src/infrastructure/database/repositories/formato.repository.ts` | `listar()`: `SELECT COUNT(*)` con mismos filtros que la consulta de datos | RF-PAG-1.4 |
+| Infraestructura DB | `src/infrastructure/database/repositories/centro-coste.repository.ts` | `listar()`: `SELECT COUNT(*)` con mismos filtros | RF-PAG-1.4 |
+| Infraestructura DB | `src/infrastructure/database/repositories/linea.repository.ts` | `listar()`: `SELECT COUNT(*)` con `deleted_at IS NULL` + mismos filtros | RF-PAG-1.4 |
+| Presentación / tipos | `presentation/src/types/api.ts` | `Pagina<T>` añade `totalCount: number` | RF-PAG-1.6 |
+| Presentación / UI | `presentation/src/pages/Lineas.tsx`, `presentation/src/components/catalogos/FormatosPanel.tsx`, `presentation/src/components/catalogos/CentrosCostePanel.tsx` | `totalPaginas = Math.ceil(totalCount / límite)` desde `pagina.totalCount`; nunca `cursores.length`; `totalCount = 0` → "0 registros" | RF-PAG-1.7, RF-PAG-1.8 |
+
+#### F.2.2 Consulta `COUNT(*)` separada (no `COUNT(*) OVER()`)
+
+Cada repositorio ejecuta dos consultas por listado paginado:
+
+1. La consulta de datos ya existente (cláusulas `WHERE`, `JOIN`, `ORDER BY` por columna de cursor, `LIMIT $n + 1`).
+2. Una segunda consulta `SELECT COUNT(*) FROM <tabla> [JOINs] WHERE <misma condición que la de datos>`, con los mismos parámetros y filtros dinámicos, que devuelve exactamente un entero ≥ 0.
+
+Para líneas la condición incluye siempre `l.deleted_at IS NULL`; para formatos y centros de coste no hay soft delete.
+
+Decisión del delta (D-2 de spec §10.3): `SELECT COUNT(*)` separado, nunca `COUNT(*) OVER()`. Justificación: `COUNT(*) OVER()` obliga a materializar el resultset completo antes de aplicar `LIMIT` y acopla el conteo a cualquier `ORDER BY`/`LIMIT`; la consulta separada reutiliza el mismo predicado `WHERE`, puede aprovechar los índices existentes y no altera la query de datos. Alternativa descartada: ventana `COUNT(*) OVER()` (penaliza en listados grandes y complica la query).
+
+El puerto `PaginaCursor<T>` es el contrato entre repositorio y servicio: `totalCount` viaja sin modificar `items`, `next_cursor` ni `has_next_page`.
+
+#### F.2.3 Cálculo de `totalPaginas` en la UI
+
+- `totalPaginas = Math.ceil(totalCount / límite)` donde `límite` es el `limit` que la UI envía al servidor (20 en todos los paneles paginados).
+- Nunca se deriva de `cursores.length` (longitud de la página actual, siempre ≤ límite).
+- `totalCount = 0` → `items: []`, `next_cursor: null`, `has_next_page: false`; el componente `Pagination` pinta "0 registros" y deshabilita «Siguiente»; nunca "Página 1 de 0".
+- `totalPaginas` se calcula desde el primer render usando `pagina.totalCount`; si el backend aún no envía `total_count` (despliegue parcial), `totalPaginas` queda `undefined` y la UI conserva el comportamiento anterior (controles sin total de páginas) — ver F.3.
+
+#### F.2.4 Riesgos y mitigaciones
+
+| Riesgo | Mitigación |
+| ------ | ---------- |
+| Rendimiento de `COUNT(*)` con filtros sobre tablas grandes | Reutiliza el mismo `WHERE` (y `JOIN`) de la consulta de datos, por lo que beneficia de los mismos índices (p. ej. `idx_linea_centro_coste`, `idx_linea_estado`); ninguna consulta nueva de escaneo full-table sin filtro. |
+| Consistencia entre conteo y página (datos cambian entre ambas consultas) | Las dos consultas van de forma secuencial inmediata; una pequeña inconsistencia transitoria es aceptable (la paginación por cursor no promete consistencia estricta entre conteo y páginas). Se documenta en el servicio. |
+| `totalCount = 0` en UI | `totalPaginas = Math.ceil(0 / 20) = 0`; `Pagination` muestra "0 registros" y deshabilita «Anterior» y «Siguiente»; nunca "Página 1 de 0" (RF-PAG-1.8). |
+| `totalPaginas` undefined si el backend no envía `total_count` aún | La UI lee `pagina?.totalCount` y solo calcula `totalPaginas` cuando el valor existe; si es `undefined`, conserva el comportamiento anterior basado en `cursores.length`/`next_cursor`. Se activa `totalPaginas` una vez el backend despliegue `total_count` en los 3 endpoints. |
+| Regresión en los 94 RF existentes | El cambio es aditivo: `total_count` viaja en la respuesta junto a los campos existentes; los tests de paginación existentes siguen verdes sin modificación (RF-PAG-1.9, AC-5). |
+
+### F.3 Orden de implementación y criterio de hecho por tarea
+
+Orden: **T-32** (puerto de dominio) → **T-33** (respuestas HTTP) → **T-34** (schema Zod) → **T-35** (repositorio formatos) → **T-36** (repositorio centros de coste) → **T-37** (repositorio líneas) → **T-38** (tipo frontend) → **T-39** (UI paneles) → **T-40** (tests HTTP + verificación final). Los cambios de backend van primero (puerto, respuestas, schema, 3 repositorios); el frontend consume el nuevo campo una vez el backend lo entrega; los tests cierran el delta.
+
+**Hecho cuando** pasan, sin errores: `pnpm test`, `pnpm test:e2e`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` (incluyendo `specs/**` y `MEMORY.md`), `pnpm build`, `pnpm --dir presentation typecheck`, `pnpm --dir presentation build` y `pnpm db:generate` («No schema changes»). Cada tarea deja `pnpm test` en verde antes de pasar a la siguiente.
+
+### F.4 Trazabilidad RF → tarea
+
+| RF | Tarea | Qué cubre |
+| -- | ----- | --------- |
+| RF-PAG-1.1 | T-32 | `PaginaCursor<T>` con `totalCount: number` |
+| RF-PAG-1.2 | T-33 | `PaginaResponse<T>` con `total_count` |
+| RF-PAG-1.3 | T-34 | `paginaSchema()` valida `total_count` entero ≥ 0 |
+| RF-PAG-1.4 | T-35, T-36, T-37 | `SELECT COUNT(*)` separado en formatos, centros de coste y líneas |
+| RF-PAG-1.5 | T-33 | `toPaginaResponse()` incluye `total_count` |
+| RF-PAG-1.6 | T-38 | `Pagina<T>` de la SPA con `totalCount: number` |
+| RF-PAG-1.7 | T-39 | `totalPaginas = Math.ceil(totalCount / límite)` en los 3 paneles |
+| RF-PAG-1.8 | T-39 | `totalCount = 0` → "0 registros", `totalPaginas` desde el primer render |
+| RF-PAG-1.9 | T-40 | No regresión: los 94 RF de v1.3 siguen CUMPLE |
+| RF-PAG-1.10 | T-40 | Pruebas HTTP de `total_count` en `GET /formatos`, `GET /centros-coste`, `GET /lineas` |
+
+---
+
+**Aprobación**: pendiente

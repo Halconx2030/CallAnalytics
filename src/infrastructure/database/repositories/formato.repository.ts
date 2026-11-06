@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, count, eq, inArray, sql, type SQL } from 'drizzle-orm';
 
 import { Formato } from '@domain/entities/Formato.js';
 
@@ -95,6 +95,9 @@ export class DrizzleFormatoRepository implements FormatoRepository {
    */
   async listar(paginacion: PaginacionCursor): Promise<PaginaCursor<Formato>> {
     const limit = normalizarLimit(paginacion.limit);
+    // Condiciones de filtro (sin el predicado del cursor): se reutilizan para contar el total.
+    // El cursor de paginación no es un filtro, por lo que no debe afectar al COUNT(*).
+    const condicionesFiltros: SQL[] = [];
     const condiciones: SQL[] = [];
 
     if (paginacion.afterId !== undefined) {
@@ -118,6 +121,16 @@ export class DrizzleFormatoRepository implements FormatoRepository {
       .orderBy(ordenKeyset(sql`${schema.formatos.nombre}`, sql`${schema.formatos.id}`, true))
       .limit(limit + 1);
 
+    const filasCount = await this.db
+      .select({ count: count() })
+      .from(schema.formatos)
+      .where(and(...condicionesFiltros));
+
+    const totalCountRaw = filasCount[0]?.count;
+
+    const totalCount =
+      typeof totalCountRaw === 'string' ? parseInt(totalCountRaw, 10) : totalCountRaw ?? 0;
+
     const hasNextPage = filas.length > limit;
     const items = filas.slice(0, limit).map((fila) => Formato.reconstituirFormato(fila));
     const ultima = filas[limit - 1];
@@ -126,7 +139,7 @@ export class DrizzleFormatoRepository implements FormatoRepository {
         ? codificarCursor(ultima.nombre, ultima.id, 'nombre')
         : null;
 
-    return { items, nextCursor, hasNextPage };
+    return { items, nextCursor, hasNextPage, totalCount };
   }
 
   async actualizar(formato: Formato, versionEsperada: number): Promise<Formato | null> {

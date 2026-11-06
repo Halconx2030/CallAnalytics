@@ -72,5 +72,7 @@ export function paginaSchema<T extends z.ZodTypeAny>(item: T) {
     next_cursor: z.string().nullable(),
     /** Indica si existe una página siguiente. */
     has_next_page: z.boolean(),
+    /** Total de elementos disponibles (sin paginar), entero >= 0 (RF-PAG-1.3). */
+    total_count: z.number().int().nonnegative(),
   });
 }

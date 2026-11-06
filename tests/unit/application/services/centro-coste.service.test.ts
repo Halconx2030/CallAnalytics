@@ -92,12 +92,14 @@ describe('CentroCosteService', () => {
         items: [centroPersistido()],
         nextCursor: null,
         hasNextPage: false,
+        totalCount: 1,
       });
 
       const pagina = await service.listar({ codigo: '51' }, { limit: 20 });
 
       expect(pagina.items).toHaveLength(1);
       expect(pagina.items[0]?.codigo).toBe('510');
+      expect(pagina.totalCount).toBe(1);
       expect(centrosCoste.listar).toHaveBeenCalledWith({ codigo: '51', limit: 20 });
     });
 
@@ -106,6 +108,7 @@ describe('CentroCosteService', () => {
         items: [centroPersistido()],
         nextCursor: null,
         hasNextPage: false,
+        totalCount: 1,
       });
 
       await service.listar({ busqueda: 'falabella' }, { limit: 20 });
@@ -118,6 +121,7 @@ describe('CentroCosteService', () => {
         items: [],
         nextCursor: null,
         hasNextPage: false,
+        totalCount: 0,
       });
 
       await service.listar({ busqueda: 'central', formatoId: ID_FORMATO }, { limit: 20 });

@@ -301,7 +301,8 @@ export function Lineas() {
 
       <Pagination
         paginaActual={indicePagina + 1}
-        totalPaginas={cursores.length}
+        totalPaginas={Math.ceil((data?.totalCount ?? 0) / LIMITE_PAGINA)}
+        totalRegistros={data?.totalCount ?? undefined}
         onCambioPagina={irAAnterior}
         onSiguiente={irASiguiente}
         haySiguiente={data?.has_next_page === true}

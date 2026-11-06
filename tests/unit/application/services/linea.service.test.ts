@@ -103,17 +103,24 @@ describe('LineaService', () => {
         ],
         nextCursor: 'cursor-1',
         hasNextPage: true,
+        totalCount: 1,
       });
 
       const pagina = await service.listar({ estado: 'activa', limit: 20 });
 
       expect(pagina.items[0]?.centroCosteCodigo).toBe('510');
       expect(pagina.nextCursor).toBe('cursor-1');
+      expect(pagina.totalCount).toBe(1);
       expect(lineas.listar).toHaveBeenCalledWith({ estado: 'activa', limit: 20 });
     });
 
     it('pasa el filtro de búsqueda de centro de coste al repositorio', async () => {
-      lineas.listar.mockResolvedValue({ items: [], nextCursor: null, hasNextPage: false });
+      lineas.listar.mockResolvedValue({
+        items: [],
+        nextCursor: null,
+        hasNextPage: false,
+        totalCount: 0,
+      });
 
       await service.listar({ centroCosteBusqueda: 'FALABELLA', limit: 20 });
 

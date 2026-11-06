@@ -78,6 +78,8 @@ export interface PaginaResponse<T> {
   readonly items: T[];
   readonly next_cursor: string | null;
   readonly has_next_page: boolean;
+  /** Total de elementos que coinciden con los filtros de la consulta paginada. */
+  readonly total_count: number;
 }
 
 /** Convierte un DTO de formato a la respuesta HTTP. */
@@ -146,6 +148,7 @@ export function toPaginaResponse<T, R>(
     items: pagina.items.map((item) => mapper(item)),
     next_cursor: pagina.nextCursor,
     has_next_page: pagina.hasNextPage,
+    total_count: pagina.totalCount,
   };
 }
 

@@ -161,6 +161,59 @@ describe('DrizzleFormatoRepository (integración)', () => {
     expect(paginas).toBe(3);
   });
 
+  it('listar devuelve totalCount igual al total de filas en BD', async () => {
+    for (let indice = 0; indice < 7; indice += 1) {
+      await repo.crear(Formato.crearFormato({ nombre: `FORMATO-${indice}` }));
+    }
+
+    const pagina = await repo.listar({ limit: 3 });
+
+    expect(pagina.totalCount).toBe(7);
+    expect(pagina.items.length).toBe(3);
+    expect(pagina.hasNextPage).toBe(true);
+  });
+
+  it('listar con afterId devuelve totalCount como número válido', async () => {
+    for (let indice = 0; indice < 7; indice += 1) {
+      await repo.crear(Formato.crearFormato({ nombre: `FORMATO-${indice}` }));
+    }
+
+    const primera = await repo.listar({ limit: 3 });
+    const segunda = await repo.listar({ limit: 3, afterId: primera.nextCursor ?? '' });
+
+    expect(typeof segunda.totalCount).toBe('number');
+    expect(segunda.totalCount).toBeGreaterThanOrEqual(0);
+    expect(segunda.items.length).toBeLessThanOrEqual(3);
+  });
+
+  it('listar con afterId no incluye el predicado del cursor en el COUNT (RF-PAG-1.4)', async () => {
+    for (let indice = 0; indice < 7; indice += 1) {
+      await repo.crear(Formato.crearFormato({ nombre: `FORMATO-${indice}` }));
+    }
+
+    const primera = await repo.listar({ limit: 3 });
+    const segunda = await repo.listar({ limit: 3, afterId: primera.nextCursor ?? '' });
+
+    // El total debe ser el de todas las filas que coinciden con los filtros (7), no el resto
+    // tras el cursor (4). El cursor es de paginación, no un filtro.
+    expect(segunda.totalCount).toBe(7);
+    expect(segunda.items.map((formato) => formato.nombre)).toEqual([
+      'FORMATO-3',
+      'FORMATO-4',
+      'FORMATO-5',
+    ]);
+    expect(segunda.hasNextPage).toBe(true);
+  });
+
+  it('listar con 0 registros devuelve totalCount 0', async () => {
+    const pagina = await repo.listar({ limit: 3 });
+
+    expect(pagina.totalCount).toBe(0);
+    expect(pagina.items).toEqual([]);
+    expect(pagina.hasNextPage).toBe(false);
+    expect(pagina.nextCursor).toBeNull();
+  });
+
   it('rechaza un cursor inválido con ValidationError', async () => {
     await expect(repo.listar({ afterId: 'no-es-un-cursor' })).rejects.toThrow();
   });

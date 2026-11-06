@@ -1,4 +1,4 @@
-import { and, eq, inArray, or, sql, type SQL } from 'drizzle-orm';
+import { and, count, eq, inArray, or, sql, type SQL } from 'drizzle-orm';
 
 import { CentroCoste } from '@domain/entities/CentroCoste.js';
 
@@ -130,24 +130,27 @@ export class DrizzleCentroCosteRepository implements CentroCosteRepository {
 
   async listar(opciones: OpcionesListadoCentroCoste): Promise<PaginaCursor<CentroCoste>> {
     const limit = normalizarLimit(opciones.limit);
-    const condiciones: SQL[] = [];
+    const condicionesFiltros: SQL[] = [];
 
     if (opciones.codigo !== undefined) {
-      condiciones.push(ilikeSeguro(sql`${schema.centrosCoste.codigo}`, opciones.codigo));
+      condicionesFiltros.push(ilikeSeguro(sql`${schema.centrosCoste.codigo}`, opciones.codigo));
     }
     if (opciones.nombre !== undefined) {
-      condiciones.push(ilikeSeguro(sql`${schema.centrosCoste.nombre}`, opciones.nombre));
+      condicionesFiltros.push(ilikeSeguro(sql`${schema.centrosCoste.nombre}`, opciones.nombre));
     }
     if (opciones.formatoId !== undefined) {
-      condiciones.push(eq(schema.centrosCoste.formatoId, opciones.formatoId));
+      condicionesFiltros.push(eq(schema.centrosCoste.formatoId, opciones.formatoId));
     }
     if (opciones.busqueda !== undefined) {
       const condicion = this.condicionBusqueda(opciones.busqueda);
 
       if (condicion !== undefined) {
-        condiciones.push(condicion);
+        condicionesFiltros.push(condicion);
       }
     }
+
+    const condiciones: SQL[] = [...condicionesFiltros];
+
     if (opciones.afterId !== undefined) {
       const cursor = decodificarCursor(opciones.afterId, 'created_at');
       condiciones.push(
@@ -171,6 +174,16 @@ export class DrizzleCentroCosteRepository implements CentroCosteRepository {
       )
       .limit(limit + 1);
 
+    const filasCount = await this.db
+      .select({ count: count() })
+      .from(schema.centrosCoste)
+      .where(and(...condicionesFiltros));
+
+    const totalCountRaw = filasCount[0]?.count;
+
+    const totalCount =
+      typeof totalCountRaw === 'string' ? parseInt(totalCountRaw, 10) : totalCountRaw ?? 0;
+
     const hasNextPage = filas.length > limit;
     const items = filas.slice(0, limit).map((fila) => CentroCoste.reconstituirCentroCoste(fila));
     const ultima = filas[limit - 1];
@@ -179,7 +192,7 @@ export class DrizzleCentroCosteRepository implements CentroCosteRepository {
         ? codificarCursor(ultima.createdAt.toISOString(), ultima.id, 'created_at')
         : null;
 
-    return { items, nextCursor, hasNextPage };
+    return { items, nextCursor, hasNextPage, totalCount };
   }
 
   async actualizar(centroCoste: CentroCoste, versionEsperada: number): Promise<CentroCoste | null> {

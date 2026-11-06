@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
+import { and, count, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 
 import { LineaTelefonica } from '@domain/entities/LineaTelefonica.js';
 import { CostoMensual } from '@domain/value-objects/CostoMensual.js';
@@ -182,8 +182,11 @@ export class DrizzleLineaRepository implements LineaRepository {
     const columna = opciones.sortColumn ?? 'created_at';
     const ascendente = (opciones.sortOrder ?? 'desc') === 'asc';
 
-    const condiciones: SQL[] = [isNull(schema.lineasTelefonicas.deletedAt)];
-    condiciones.push(...this.condicionesFiltro(opciones));
+    // Condiciones de filtro (sin el predicado de cursor): se reutilizan para contar el total.
+    const condicionesFiltroBase: SQL[] = [isNull(schema.lineasTelefonicas.deletedAt)];
+    condicionesFiltroBase.push(...this.condicionesFiltro(opciones));
+
+    const condiciones: SQL[] = [...condicionesFiltroBase];
 
     if (opciones.afterId !== undefined) {
       const cursor = decodificarCursor(opciones.afterId, columna);
@@ -217,6 +220,20 @@ export class DrizzleLineaRepository implements LineaRepository {
       )
       .limit(limit + 1);
 
+    // `SELECT COUNT(*)` separado con las mismas condiciones de filtro (sin ORDER BY ni LIMIT).
+    const filasCount = await this.db
+      .select({ count: count() })
+      .from(schema.lineasTelefonicas)
+      .innerJoin(
+        schema.centrosCoste,
+        eq(schema.lineasTelefonicas.centroCosteId, schema.centrosCoste.id)
+      )
+      .where(and(...condicionesFiltroBase));
+
+    const totalCountRaw = filasCount[0]?.count;
+    const totalCount =
+      typeof totalCountRaw === 'string' ? parseInt(totalCountRaw, 10) : totalCountRaw ?? 0;
+
     const hasNextPage = filas.length > limit;
     const pagina = filas.slice(0, limit);
     const items: LineaListado[] = pagina.map((fila) => ({
@@ -231,7 +248,7 @@ export class DrizzleLineaRepository implements LineaRepository {
         ? codificarCursor(this.valorCursor(columna, ultima), ultima.id, columna)
         : null;
 
-    return { items, nextCursor, hasNextPage };
+    return { items, nextCursor, hasNextPage, totalCount };
   }
 
   async actualizar(

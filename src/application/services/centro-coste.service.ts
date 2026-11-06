@@ -71,6 +71,7 @@ export class CentroCosteService {
       items: pagina.items.map((centro) => toCentroCosteDto(centro)),
       nextCursor: pagina.nextCursor,
       hasNextPage: pagina.hasNextPage,
+      totalCount: pagina.totalCount,
     };
   }
 

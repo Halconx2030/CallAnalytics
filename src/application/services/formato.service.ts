@@ -46,6 +46,7 @@ export class FormatoService {
       items: pagina.items.map((formato) => toFormatoDto(formato)),
       nextCursor: pagina.nextCursor,
       hasNextPage: pagina.hasNextPage,
+      totalCount: pagina.totalCount,
     };
   }
 

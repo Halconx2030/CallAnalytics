@@ -724,3 +724,128 @@ en los `DELETE`) y (b) aplicar también los hallazgos nº3, nº4 y nº5. El hall
 | **T-29** | Formato de specs con Prettier + `format:check`                     | (sin RF)                  | [x]    |
 | **T-30** | Cierre en `MEMORY.md` del delta v1.3                               | (sin RF)                  | [x]    |
 | **T-31** | Verificación final del delta v1.3                                  | (sin RF)                  | [x]    |
+
+## Delta v1.4 — total_count en paginación por cursor (2026-11-06)
+
+**Basado en**: `plan.md` → «Plan del delta v1.4 — total_count en paginación por cursor (2026-11-06)» y `spec.md` **v1.4** (104 RF: 94 de la v1.3 + RF-PAG-1.1…1.10). **Regla**: una tarea = una llamada del implementer. Tests primero (TDD) y cada tarea deja `pnpm test` en verde. Las tareas T-01…T-31 ya están completadas y permanecen intactas con sus marcas `[x]`; el delta empieza en T-32. Al completar cada tarea, marcar `- [x]`.
+
+### T-32 · Dominio: `PaginaCursor<T>` con `totalCount`
+
+- [x] RF-PAG-1.1
+- Archivos:
+  - `src/application/ports/repositories/paginacion.ts`
+- Pasos:
+  1. Añadir `totalCount: number` a `PaginaCursor<T>` junto a `items`, `next_cursor` y `has_next_page`.
+  2. Comprobar que el tipo compila (`pnpm typecheck`) y que no rompe contratos existentes (el campo se rellena en T-35/T-36/T-37).
+- **Hecho cuando:** `PaginaCursor<T>` declara `totalCount: number` y `pnpm typecheck` pasa.
+- Verificación: `pnpm typecheck`.
+
+### T-33 · HTTP respuestas: `PaginaResponse<T>` con `total_count`
+
+- [x] RF-PAG-1.2, RF-PAG-1.5
+- Archivos:
+  - `src/infrastructure/http/respuestas.ts`
+- Pasos:
+  1. Añadir `total_count: number` a `PaginaResponse<T>`.
+  2. Actualizar `toPaginaResponse()` para copiar `totalCount` del dominio a `total_count` de la respuesta HTTP.
+- **Hecho cuando:** `toPaginaResponse()` incluye `total_count` y el contrato de los 3 endpoints de listado puede llevar el campo.
+- Verificación: `pnpm typecheck`.
+
+### T-34 · Zod: `paginaSchema()` valida `total_count`
+
+- [x] RF-PAG-1.3
+- Archivos:
+  - `src/infrastructure/http/schemas/comunes.ts`
+- Pasos:
+  1. Añadir `total_count: z.number().int().nonnegative()` a `paginaSchema()`.
+  2. Verificar (en T-40) que un `total_count` negativo o no entero se rechaza con 400.
+- **Hecho cuando:** `paginaSchema()` acepta enteros ≥ 0 y rechaza negativos o no enteros con error de validación Zod.
+- Verificación: `pnpm typecheck`; `pnpm test tests/integration/http/` (caso de T-40).
+
+### T-35 · Repositorio de formatos: `SELECT COUNT(*)` en `listar()`
+
+- [x] RF-PAG-1.4
+- Archivos:
+  - `src/infrastructure/database/repositories/formato.repository.ts`
+- Pasos:
+  1. En `listar()`, añadir una segunda consulta `SELECT COUNT(*) FROM formatos WHERE <mismos filtros dinámicos que la consulta de datos>` con los mismos parámetros.
+  2. Retornar `totalCount` dentro de `PaginaCursor<Formato>` junto a `items`, `next_cursor` y `has_next_page`.
+  3. No usar `COUNT(*) OVER()`.
+- **Hecho cuando:** `listar()` devuelve `totalCount` igual al total de filas en BD, independiente de `limit` y `after_id`; prueba de integración del repositorio en verde.
+- Verificación: `pnpm test tests/integration/database/formato.repository.test.ts`; `pnpm typecheck`.
+
+### T-36 · Repositorio de centros de coste: `SELECT COUNT(*)` en `listar()`
+
+- [x] RF-PAG-1.4
+- Archivos:
+  - `src/infrastructure/database/repositories/centro-coste.repository.ts`
+- Pasos:
+  1. En `listar()`, añadir `SELECT COUNT(*) FROM centros_coste WHERE <mismos filtros (codigo, nombre, formato_id, busqueda)>` con los mismos parámetros.
+  2. Retornar `totalCount` en `PaginaCursor<CentroCoste>`.
+- **Hecho cuando:** `listar()` devuelve `totalCount` coherente con los filtros aplicados; prueba de integración en verde.
+- Verificación: `pnpm test tests/integration/database/centro-coste.repository.test.ts`; `pnpm typecheck`.
+
+### T-37 · Repositorio de líneas: `SELECT COUNT(*)` en `listar()`
+
+- [x] RF-PAG-1.4
+- Archivos:
+  - `src/infrastructure/database/repositories/linea.repository.ts`
+- Pasos:
+  1. En `listar()`, añadir `SELECT COUNT(*) FROM lineas_telefonicas l INNER JOIN centros_coste c ... WHERE l.deleted_at IS NULL <mismos filtros dinámicos>` con los mismos parámetros.
+  2. Retornar `totalCount` en `PaginaCursor<Linea>` (solo líneas no dadas de baja).
+- **Hecho cuando:** `listar()` devuelve `totalCount` contando solo `deleted_at IS NULL` con los mismos filtros que la consulta de datos; prueba de integración en verde.
+- Verificación: `pnpm test tests/integration/database/linea.repository.test.ts`; `pnpm typecheck`.
+
+### T-38 · Frontend: tipo `Pagina<T>` con `totalCount`
+
+- [x] RF-PAG-1.6
+- Archivos:
+  - `presentation/src/types/api.ts`
+- Pasos:
+  1. Añadir `totalCount: number` a `Pagina<T>` (además de `items`, `next_cursor` y `has_next_page`).
+  2. Verificar que los hooks (`useFormatos`, `useCentrosCoste`, `useLineas`) tipan la respuesta paginada con el nuevo campo.
+- **Hecho cuando:** `Pagina<T>` declara `totalCount: number` y `pnpm --dir presentation typecheck` pasa.
+- Verificación: `pnpm --dir presentation typecheck`.
+
+### T-39 · UI paneles: `totalPaginas` desde `pagina.totalCount`
+
+- [x] RF-PAG-1.7, RF-PAG-1.8
+- Archivos:
+  - `presentation/src/pages/Lineas.tsx` (~línea 304)
+  - `presentation/src/components/catalogos/FormatosPanel.tsx` (~línea 153)
+  - `presentation/src/components/catalogos/CentrosCostePanel.tsx` (~línea 227)
+- Pasos:
+  1. En cada panel, calcular `totalPaginas = Math.ceil(totalCount / límite)` usando `data?.totalCount` / `pagina?.totalCount`, nunca `cursores.length`.
+  2. Cuando `totalCount = 0`, mostrar "0 registros" y deshabilitar «Anterior» y «Siguiente»; nunca "Página 1 de 0"; `totalPaginas` disponible desde el primer render.
+  3. Si `totalCount` es `undefined` (backend sin desplegar aún), conservar el comportamiento anterior basado en `cursores.length`/`next_cursor`.
+- **Hecho cuando:** los 3 paneles calculan `totalPaginas` desde `totalCount`; `totalCount = 0` pinta "0 registros"; `pnpm --dir presentation typecheck` y `pnpm --dir presentation build` pasan.
+- Verificación: `pnpm --dir presentation typecheck`; `pnpm --dir presentation build`.
+
+### T-40 · Tests HTTP de `total_count` + verificación final del delta
+
+- [x] RF-PAG-1.10, RF-PAG-1.9
+- Archivos:
+  - `tests/integration/http/api.test.ts` (tests HTTP de los listados paginados)
+- Pasos:
+  1. Añadir pruebas HTTP que verifiquen que `GET /api/v1/formatos`, `GET /api/v1/centros-coste` y `GET /api/v1/lineas` incluyen `total_count: number` ≥ 0 en la respuesta paginada (AC-1, AC-2).
+  2. Verificar el caso 0 registros: `total_count: 0`, `items: []`, `next_cursor: null`, `has_next_page: false` (AC-3).
+  3. Verificar que `paginaSchema()` rechaza `total_count` negativo o no entero con 400 (AC-6).
+  4. Ejecutar la suite completa: `pnpm test`, `pnpm test:e2e`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm build`, `pnpm --dir presentation typecheck`, `pnpm --dir presentation build`, `pnpm db:generate` («No schema changes»).
+- **Hecho cuando:** las 3 respuestas de listado incluyen `total_count` correcto; el caso 0 registros cumple AC-3; la suite completa está en verde sin regresión de los 94 RF existentes.
+- Verificación: `pnpm test`, `pnpm test:e2e`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm build`.
+
+## Resumen del delta v1.4 — total_count en paginación por cursor
+
+| Tarea    | Contenido                                                          | RFs principales  | Estado |
+| -------- | ------------------------------------------------------------------ | ---------------- | ------ |
+| **T-32** | Dominio: `PaginaCursor<T>` con `totalCount`                        | RF-PAG-1.1       | [x]    |
+| **T-33** | HTTP: `PaginaResponse<T>` con `total_count` y `toPaginaResponse()` | RF-PAG-1.2, 1.5  | [x]    |
+| **T-34** | Zod: `paginaSchema()` valida `total_count` entero ≥ 0              | RF-PAG-1.3       | [x]    |
+| **T-35** | Repositorio formatos: `SELECT COUNT(*)` separado                   | RF-PAG-1.4       | [x]    |
+| **T-36** | Repositorio centros de coste: `SELECT COUNT(*)` separado           | RF-PAG-1.4       | [x]    |
+| **T-37** | Repositorio líneas: `SELECT COUNT(*)` con `deleted_at IS NULL`     | RF-PAG-1.4       | [x]    |
+| **T-38** | SPA: `Pagina<T>` con `totalCount: number`                          | RF-PAG-1.6       | [x]    |
+| **T-39** | UI 3 paneles: `totalPaginas = Math.ceil(totalCount / límite)`      | RF-PAG-1.7, 1.8  | [x]    |
+| **T-40** | Tests HTTP `total_count` + suite completa                          | RF-PAG-1.10, 1.9 | [x]    |
+
+**Conteo RF del delta v1.4**: 94 RF existentes (v1.3) + 10 RF nuevos (RF-PAG-1.1 … RF-PAG-1.10) = **104 RF totales**. Todas las tareas `[ ]` están pendientes de implementación.

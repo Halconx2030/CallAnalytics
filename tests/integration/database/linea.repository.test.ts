@@ -153,6 +153,38 @@ describe('DrizzleLineaRepository (integración)', () => {
     expect(vistos.size).toBe(25);
   });
 
+  it('devuelve totalCount con el total de líneas activas que coinciden con los filtros', async () => {
+    await repo.crear(
+      LineaTelefonica.crearLineaTelefonica({ numero: '900000001', centroCosteId })
+    );
+    await repo.crear(
+      LineaTelefonica.crearLineaTelefonica({ numero: '900000002', centroCosteId: otroCentroCosteId })
+    );
+    await repo.crear(
+      LineaTelefonica.crearLineaTelefonica({ numero: '900000003', centroCosteId })
+    );
+
+    const pagina = await repo.listar({ limit: 100 });
+    expect(pagina.totalCount).toBe(3);
+    expect(pagina.items).toHaveLength(3);
+
+    const otro = await repo.listar({ centroCosteId: otroCentroCosteId, limit: 100 });
+    expect(otro.totalCount).toBe(1);
+    expect(otro.items).toHaveLength(1);
+
+    const sinCoincidencias = await repo.listar({ proveedor: 'NOEXISTE', limit: 100 });
+    expect(sinCoincidencias.totalCount).toBe(0);
+    expect(sinCoincidencias.items).toHaveLength(0);
+
+    // Las dadas de baja no se cuentan (condicion deleted_at IS NULL).
+    const dadaDeBaja = await repo.crear(
+      LineaTelefonica.crearLineaTelefonica({ numero: '900000004', centroCosteId })
+    );
+    await repo.actualizarEstadoMasivo([dadaDeBaja.id ?? ''], 'baja', new Date());
+    const activas = await repo.listar({ limit: 100 });
+    expect(activas.totalCount).toBe(3);
+  });
+
   it('aplica los filtros de texto, enums, fechas y costos', async () => {
     await repo.crear(
       LineaTelefonica.crearLineaTelefonica({

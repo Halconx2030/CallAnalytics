@@ -150,7 +150,8 @@ export function FormatosPanel() {
 
       <Pagination
         paginaActual={indicePagina + 1}
-        totalPaginas={cursores.length}
+        totalPaginas={Math.ceil((pagina?.totalCount ?? 0) / LIMITE_PAGINA)}
+        totalRegistros={pagina?.totalCount ?? undefined}
         onCambioPagina={irAAnterior}
         onSiguiente={irASiguiente}
         haySiguiente={pagina?.has_next_page === true}

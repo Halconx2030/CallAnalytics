@@ -64,6 +64,7 @@ describe('FormatoService', () => {
         items: [formatoPersistido('SMU')],
         nextCursor: 'cursor-1',
         hasNextPage: true,
+        totalCount: 3,
       });
 
       const pagina = await service.listar({ limit: 20 });
@@ -72,6 +73,7 @@ describe('FormatoService', () => {
       expect(pagina.items[0]?.nombre).toBe('SMU');
       expect(pagina.nextCursor).toBe('cursor-1');
       expect(pagina.hasNextPage).toBe(true);
+      expect(pagina.totalCount).toBe(3);
     });
   });
 

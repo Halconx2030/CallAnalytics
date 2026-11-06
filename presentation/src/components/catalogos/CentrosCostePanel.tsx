@@ -19,6 +19,7 @@ interface FiltrosCentro {
 }
 
 const FILTROS_VACIOS: FiltrosCentro = { codigo: '', nombre: '', formato_id: '' };
+const LIMITE_PAGINA = 20;
 
 /** Panel de CRUD de centros de coste (RF-CC-1.1 a RF-CC-1.6). */
 export function CentrosCostePanel() {
@@ -224,7 +225,8 @@ export function CentrosCostePanel() {
 
       <Pagination
         paginaActual={indicePagina + 1}
-        totalPaginas={cursores.length}
+        totalPaginas={Math.ceil((pagina?.totalCount ?? 0) / LIMITE_PAGINA)}
+        totalRegistros={pagina?.totalCount ?? undefined}
         onCambioPagina={irAAnterior}
         onSiguiente={irASiguiente}
         haySiguiente={pagina?.has_next_page === true}

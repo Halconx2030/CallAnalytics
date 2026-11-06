@@ -28,6 +28,8 @@ export interface PaginaCursor<T> {
   readonly nextCursor: string | null;
   /** `true` cuando existen más elementos después de esta página. */
   readonly hasNextPage: boolean;
+  /** Total de elementos que coinciden con los filtros de la consulta paginada. */
+  readonly totalCount: number;
 }
 
 /**

@@ -199,6 +199,54 @@ describe('DrizzleCentroCosteRepository (integración)', () => {
     expect(vistos.size).toBe(5);
   });
 
+  it('devuelve totalCount con el total de filas que coinciden con los filtros', async () => {
+    await repo.crear(CentroCoste.crearCentroCoste({ codigo: '510', nombre: 'RENDIC', formatoId }));
+    await repo.crear(
+      CentroCoste.crearCentroCoste({ codigo: 'C059102801', nombre: 'FALABELLA TOTTUS', formatoId })
+    );
+    await repo.crear(
+      CentroCoste.crearCentroCoste({
+        codigo: '777',
+        nombre: 'OTRO CENTRO',
+        formatoId: otroFormatoId,
+      })
+    );
+
+    const todos = await repo.listar({});
+    expect(todos.totalCount).toBe(3);
+
+    const porFormato = await repo.listar({ formatoId: otroFormatoId });
+    expect(porFormato.totalCount).toBe(1);
+
+    const porBusqueda = await repo.listar({ busqueda: 'rendic' });
+    expect(porBusqueda.totalCount).toBe(1);
+
+    const sinCoincidencias = await repo.listar({ busqueda: 'ZZZ' });
+    expect(sinCoincidencias.totalCount).toBe(0);
+    expect(sinCoincidencias.items).toHaveLength(0);
+  });
+
+  it('totalCount es independiente del límite y del cursor de paginación', async () => {
+    for (let indice = 0; indice < 5; indice += 1) {
+      await repo.crear(
+        CentroCoste.crearCentroCoste({
+          codigo: `C-${indice}`,
+          nombre: `Centro ${indice}`,
+          formatoId,
+        })
+      );
+    }
+
+    const primera = await repo.listar({ limit: 2 });
+    expect(primera.totalCount).toBe(5);
+    expect(primera.items).toHaveLength(2);
+    expect(primera.hasNextPage).toBe(true);
+
+    const segunda = await repo.listar({ limit: 2, afterId: primera.nextCursor ?? undefined });
+    expect(segunda.totalCount).toBe(5);
+    expect(segunda.items).toHaveLength(2);
+  });
+
   it('actualiza con optimistic locking', async () => {
     const creado = await repo.crear(
       CentroCoste.crearCentroCoste({ codigo: '510', nombre: 'RENDIC', formatoId })

@@ -299,6 +299,26 @@ describe('API HTTP de TELEFONO 2', () => {
       expect(respuesta.headers['content-type']).toContain('application/problem+json');
     });
 
+    it('incluye total_count en la respuesta paginada (RF-PAG-1.10)', async () => {
+      for (const nombre of ['ZETA', 'ALFA', 'MU']) {
+        await crearFormato(nombre);
+      }
+
+      const respuesta = await app.inject({ method: 'GET', url: '/api/v1/formatos?limit=2' });
+
+      expect(respuesta.statusCode).toBe(200);
+
+      const cuerpo = respuesta.json<{
+        items: { nombre: string }[];
+        next_cursor: string | null;
+        has_next_page: boolean;
+        total_count: number;
+      }>();
+
+      expect(cuerpo.items).toHaveLength(2);
+      expect(cuerpo.total_count).toBe(3);
+    });
+
     it('exporta los formatos ordenados por nombre', async () => {
       await crearFormato('ZETA');
       await crearFormato('ALFA');
@@ -450,6 +470,31 @@ describe('API HTTP de TELEFONO 2', () => {
       });
 
       expect(respuesta.statusCode).toBe(400);
+    });
+
+    it('incluye total_count en la respuesta paginada (RF-PAG-1.10)', async () => {
+      const formatoId = await crearFormato();
+
+      for (const codigo of ['CC-100', 'CC-200', 'CC-300']) {
+        await crearCentroCoste(formatoId, codigo, `Centro ${codigo}`);
+      }
+
+      const respuesta = await app.inject({
+        method: 'GET',
+        url: '/api/v1/centros-coste?limit=2',
+      });
+
+      expect(respuesta.statusCode).toBe(200);
+
+      const cuerpo = respuesta.json<{
+        items: { codigo: string }[];
+        next_cursor: string | null;
+        has_next_page: boolean;
+        total_count: number;
+      }>();
+
+      expect(cuerpo.items).toHaveLength(2);
+      expect(cuerpo.total_count).toBe(3);
     });
   });
 
@@ -766,6 +811,36 @@ describe('API HTTP de TELEFONO 2', () => {
       });
 
       expect(respuesta.statusCode).toBe(400);
+    });
+
+    it('incluye total_count en la respuesta paginada (RF-PAG-1.10)', async () => {
+      const formatoId = await crearFormato();
+      const centroId = await crearCentroCoste(formatoId);
+
+      for (const numero of ['+56911111111', '+56922222222', '+56933333333']) {
+        await app.inject({
+          method: 'POST',
+          url: '/api/v1/lineas',
+          payload: { numero, centro_coste_id: centroId },
+        });
+      }
+
+      const respuesta = await app.inject({
+        method: 'GET',
+        url: '/api/v1/lineas?limit=2',
+      });
+
+      expect(respuesta.statusCode).toBe(200);
+
+      const cuerpo = respuesta.json<{
+        items: { numero: string }[];
+        next_cursor: string | null;
+        has_next_page: boolean;
+        total_count: number;
+      }>();
+
+      expect(cuerpo.items).toHaveLength(2);
+      expect(cuerpo.total_count).toBe(3);
     });
   });
 

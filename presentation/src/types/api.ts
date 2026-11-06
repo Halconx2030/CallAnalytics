@@ -5,6 +5,7 @@ export interface Pagina<T> {
   readonly items: T[];
   readonly next_cursor: string | null;
   readonly has_next_page: boolean;
+  readonly totalCount: number;
 }
 
 /** Formato de centro de coste. */

@@ -92,6 +92,7 @@ export class LineaService {
       ),
       nextCursor: pagina.nextCursor,
       hasNextPage: pagina.hasNextPage,
+      totalCount: pagina.totalCount,
     };
   }
 

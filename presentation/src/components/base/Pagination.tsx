@@ -1,7 +1,7 @@
 export interface PaginationProps {
   readonly paginaActual: number;
   readonly totalPaginas: number;
-  readonly totalRegistros?: number;
+  readonly totalRegistros?: number | undefined;
   readonly onCambioPagina: (pagina: number) => void;
   readonly onSiguiente?: () => void;
   readonly haySiguiente?: boolean;
@@ -27,9 +27,11 @@ export function Pagination({
   return (
     <div className="paginacion">
       <span className="paginacion__info">
-        {totalRegistros !== undefined
-          ? `${totalRegistros} registro(s) · página ${paginaActual} de ${totalPaginas}`
-          : `Página ${paginaActual} de ${totalPaginas}`}
+        {totalRegistros === 0
+          ? '0 registros'
+          : totalRegistros !== undefined
+            ? `${totalRegistros} registro(s) · página ${paginaActual} de ${totalPaginas}`
+            : `Página ${paginaActual} de ${totalPaginas}`}
       </span>
 
       <div className="paginacion__controles">
