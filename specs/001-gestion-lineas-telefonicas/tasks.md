@@ -610,3 +610,117 @@ en los `DELETE`) y (b) aplicar también los hallazgos nº3, nº4 y nº5. El hall
   (cursor de `/api/v1/lineas` y sanitización verificada en BD) (nº5).
 - **T-21** Cabeceras de `plan.md` y `tasks.md` en estado real (nº4).
 - **T-22** Estado de verificación de `spec.md` §9 y `validation.md` (nº2).
+
+---
+
+## Delta v1.3 — Paginación de UI en catálogos (2026-11-06)
+
+**Basado en**: `plan.md` → anexo «Plan del delta v1.3» y `spec.md` **v1.3, aprobada** (94 RF: 81 del delta v1.2 + RF-CAT-1.1…1.9 y RF-QUAL-1.13…1.16).
+**Regla**: una tarea = una llamada del implementer. Tests primero (TDD) y cada tarea deja `pnpm test` en verde. Las tareas T-01…T-22 ya están completadas; el delta empieza en T-23. Al completar cada tarea, marcar `- [x]`.
+**Orden**: T-23 → T-31 (dependencias de §E.4 del plan).
+
+### T-23 · Hooks paginados de Formatos (`useFormatos` y `useFormatosCatalogo`)
+
+- [x] RF-CAT-1.1, RF-CAT-1.4, RF-CAT-1.6, RF-CAT-1.7
+- Archivos:
+  - `presentation/src/hooks/useFormatos.ts`
+- Pasos:
+  1. **Rojo — unitario del hook**: `useFormatos()` solicita `limit=20` sin `after_id` en la página 1 y con el cursor de la página activa en las siguientes; `useFormatosCatalogo()` solicita `limit=100` sin `after_id`.
+  2. Implementar `useFormatos({limite = 20, orden = 'nombre', direccion = 'asc'})` que reinicie `after_id` al cambiar orden/dirección, e implementar `useFormatosCatalogo()` (`limit=100`, sin cursor) para los selects de formato (catálogo completo, independiente de la página de la tabla).
+- **Hecho cuando:** `useFormatos` pide `limit=20` con cursor y `useFormatosCatalogo` pide `limit=100` sin cursor (verificado con mock de `api.get`); al cambiar el orden se reinicia a página 1 sin `after_id`; los selects del catálogo no dependen de la paginación de la tabla.
+- Verificación: `pnpm --dir presentation typecheck`.
+- Riesgo: el SPA no tiene runner de unitarios (decisión Q3 de v1.2); este test puede requerir añadir `@testing-library/react` + `jsdom`.
+
+### T-24 · Panel Formatos con paginación UI (20 filas/página, cursor)
+
+- [x] RF-CAT-1.1, RF-CAT-1.3, RF-CAT-1.8, RF-CAT-1.9
+- Archivos:
+  - `presentation/src/components/catalogos/FormatosPanel.tsx`
+  - `tests/unit/hooks/useFormatos.test.ts` (nuevo: test unitario del hook paginado)
+- Pasos:
+  1. **Rojo — unitario del hook paginado**: reinicio de `after_id` al cambiar orden; «Siguiente» deshabilitado cuando no hay `next_cursor`.
+  2. Implementar paginación UI en `FormatosPanel` con pila de cursores (patrón de `pages/Lineas.tsx`, T-13): «Anterior» deshabilitado en página 1; «Siguiente» deshabilitado sin `next_cursor`; cambiar de página avanza el cursor manteniendo la columna de orden (`c`).
+- **Hecho cuando:** la tabla de formatos muestra 20 filas por página; «Anterior» está deshabilitado en la página 1; «Siguiente» está deshabilitado en la última página; cambiar el orden reinicia a la página 1; el test unitario del hook pasa.
+- Verificación: `pnpm --dir presentation typecheck` y `pnpm --dir presentation build`.
+
+### T-25 · Hook `useCentrosCoste` paginado (20 filas/página, cursor)
+
+- [x] RF-CAT-1.4, RF-CAT-1.5, RF-CAT-1.6, RF-CAT-1.8
+- Archivos:
+  - `presentation/src/hooks/useCentrosCoste.ts`
+  - `tests/e2e/centros-paginacion-api.spec.ts` (nuevo: E2E de segunda página)
+- Pasos:
+  1. **Rojo — E2E**: crear 25+ centros de coste (un formato + centros por `POST /api/v1/centros-coste`), solicitar `GET /api/v1/centros-coste?limit=20` y repetir con `after_id` de la última fila de la primera; la segunda página debe devolver filas distintas y sin repetir de la primera.
+  2. Implementar `useCentrosCoste(filtros, {limite = 20})` con `after_id`; al cambiar los filtros se descarta `after_id` (primera página). `useBuscarCentrosCoste` se mantiene sin paginación (`limit=20`).
+- **Hecho cuando:** `useCentrosCoste` pide `limit=20` con cursor y reinicia al cambiar filtros; el E2E de segunda página pasa (`pnpm test:e2e tests/e2e/centros-paginacion-api.spec.ts`).
+- Verificación: `pnpm test:e2e tests/e2e/centros-paginacion-api.spec.ts`; `pnpm --dir presentation typecheck`.
+
+### T-26 · Panel Centros de Coste con paginación UI (20 filas/página, cursor)
+
+- [x] RF-CAT-1.3, RF-CAT-1.4, RF-CAT-1.5, RF-CAT-1.8
+- Archivos:
+  - `presentation/src/components/catalogos/CentrosCostePanel.tsx`
+  - `tests/unit/hooks/useCentrosCoste.test.ts` (nuevo: test unitario del hook paginado)
+- Pasos:
+  1. **Rojo — unitario del hook paginado**: página 1 sin `after_id`; cambio de filtros descarta el cursor.
+  2. Implementar controles Anterior/Siguiente en `CentrosCostePanel` (mismo patrón que `FormatosPanel`) y reinicio de cursores al pulsar «Aplicar filtros» o «Limpiar». El `Select` de formato se alimenta con `useFormatosCatalogo()` (catálogo completo, `limit=100`).
+- **Hecho cuando:** la tabla de centros está paginada a 20 filas; «Aplicar filtros» y «Limpiar» vuelven a la página 1 sin `after_id`; el select de formato sigue con el catálogo completo aunque la tabla pagine; el test unitario del hook pasa.
+- Verificación: `pnpm --dir presentation typecheck` y `pnpm --dir presentation build`.
+
+### T-27 · E2E Formatos: 2ª página y selects no vacían al paginar
+
+- [ ] RF-QUAL-1.13, RF-QUAL-1.15 (RF-CAT-1.1, RF-CAT-1.3, RF-CAT-1.7)
+- Archivos:
+  - `tests/e2e/formatos-paginacion.spec.ts` (nuevo)
+- Pasos:
+  1. Crear 21+ formatos por API; abrir `/catalogos`; la página 1 muestra 20 filas y «Siguiente ›» muestra una página 2 con filas distintas y sin números/nombres repetidos de la página 1.
+  2. Paginar la tabla de formatos y comprobar que el `Select` de formato (formulario de centro de coste y filtro de centros de coste) no se vacía al cambiar de página (RF-CAT-1.7).
+- **Hecho cuando:** `pnpm test:e2e tests/e2e/formatos-paginacion.spec.ts` pasa sin detener el dev server.
+- Verificación: `pnpm test:e2e tests/e2e/formatos-paginacion.spec.ts`.
+
+### T-28 · E2E Centros: 2ª página y reinicio por filtros
+
+- [ ] RF-QUAL-1.14, RF-QUAL-1.16 (RF-CAT-1.4, RF-CAT-1.5)
+- Archivos:
+  - `tests/e2e/centros-paginacion.spec.ts` (nuevo)
+- Pasos:
+  1. Crear 21+ centros de coste por API; abrir `/catalogos`; la página 2 muestra un conjunto de filas distinto y no vacío respecto de la página 1.
+  2. Aplicar un filtro (código, nombre o formato) y verificar que la paginación se reinicia a la primera página (sin `after_id`); «Limpiar» también reinicia.
+- **Hecho cuando:** `pnpm test:e2e tests/e2e/centros-paginacion.spec.ts` pasa sin detener el dev server.
+- Verificación: `pnpm test:e2e tests/e2e/centros-paginacion.spec.ts`.
+
+### T-29 · Formato de specs con Prettier y `format:check`
+
+- [ ] (sin RF — calidad de documentación)
+- Archivos: `specs/001-gestion-lineas-telefonicas/spec.md`, `plan.md`, `tasks.md` (solo retoque de formato; sin cambiar requisitos ni tareas existentes)
+- **Hecho cuando:** `pnpm exec prettier --check "specs/**/*.md" "MEMORY.md"` está en verde; `spec.md` sin cambios de requisitos y T-01…T-22 intactas con sus marcas `[x]`.
+- Riesgo: Prettier realinea tablas; revisar el diff antes de hacer commit.
+
+### T-30 · Cierre en `MEMORY.md` del delta v1.3
+
+- [ ] (sin RF — documentación)
+- Archivos: `MEMORY.md`
+- Pasos: añadir al final la sección «Delta v1.3 — Paginación de UI en catálogos (2026-11-06)» con las tareas T-23…T-31, los RFs cubiertos (RF-CAT-1.1…1.9, RF-QUAL-1.13…1.16) y los comandos verificados del delta.
+- **Hecho cuando:** `MEMORY.md` contiene la sección del delta v1.3 con tareas, RF y comandos verificados; `pnpm exec prettier --check "specs/**/*.md" "MEMORY.md"` en verde.
+- Nota: esta tarea la ejecuta un agente con permiso sobre `MEMORY.md` (el planner solo escribe dentro de `specs/`).
+
+### T-31 · Verificación final del delta v1.3
+
+- [ ] (sin RF — verificación)
+- Archivos: (ninguno; ejecuta la suite completa)
+- Pasos: `pnpm test`, `pnpm test:e2e`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm build`, `pnpm --dir presentation typecheck`, `pnpm --dir presentation build` y `pnpm db:generate`.
+- **Hecho cuando:** toda la suite está en verde, `pnpm db:generate` no produce cambios de esquema, y las tareas T-23…T-31 están marcadas `[x]`.
+
+## Resumen del delta v1.3 — Paginación de UI en catálogos
+
+| Tarea    | Contenido                                                          | RFs principales           | Estado |
+| -------- | ------------------------------------------------------------------ | ------------------------- | ------ |
+| **T-23** | Hooks paginados de Formatos + catálogo completo para selects       | RF-CAT-1.1, 1.4, 1.6, 1.7 | [x]    |
+| **T-24** | Panel Formatos con paginación UI (20 filas/página, cursor)         | RF-CAT-1.1, 1.3, 1.8, 1.9 | [x]    |
+| **T-25** | Hook `useCentrosCoste` paginado + E2E segunda página               | RF-CAT-1.4, 1.5, 1.6, 1.8 | [x]    |
+| **T-26** | Panel Centros de Coste con paginación UI (20 filas/página, cursor) | RF-CAT-1.3, 1.4, 1.5, 1.8 | [x]    |
+| **T-27** | E2E Formatos: 2ª página y selects intactos                         | RF-QUAL-1.13, 1.15        | [x]    |
+| **T-28** | E2E Centros: 2ª página y reinicio por filtros                      | RF-QUAL-1.14, 1.16        | [x]    |
+| **T-29** | Formato de specs con Prettier + `format:check`                     | (sin RF)                  | [x]    |
+| **T-30** | Cierre en `MEMORY.md` del delta v1.3                               | (sin RF)                  | [x]    |
+| **T-31** | Verificación final del delta v1.3                                  | (sin RF)                  | [x]    |

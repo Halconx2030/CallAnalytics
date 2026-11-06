@@ -1637,3 +1637,49 @@ typecheck` y `pnpm --dir presentation build` OK (115 módulos); `pnpm build` OK;
   orden `created_at DESC, id DESC` que ya no existe; ahora describe el real (`nombre ASC, id ASC`, cursor keyset sobre
   `nombre`), conforme a RF-FMT-1.3 y RF-ORD-1.4. **Sin cambios de código funcional.**
 - **Verificación**: `pnpm test`, `pnpm typecheck`, `pnpm lint` y `pnpm format:check` en verde.
+
+## Delta v1.3 — Paginación de UI en catálogos (2026-11-06)
+
+**Estado**: cerrado. Tareas **T-23…T-31** en `specs/001-gestion-lineas-telefonicas/tasks.md` (todas `[x]` tras T-31).
+
+**Contexto**: el usuario pidió paginar las tablas de Formatos y Centros de Coste en el módulo de catálogos (SPA). Se tramitó como **delta v1.3 de la spec 001** (13 RF nuevos: RF-CAT-1.1…1.9 y RF-QUAL-1.13…1.16, total 81 → 94 RF), con **20 filas por página** en ambos paneles.
+
+### Decisiones del usuario
+
+| #   | Decisión                                                                      | Impacto                                                                                                                                         |
+| --- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-1 | Tramitar como **delta v1.3 de la spec 001** (no cambio suelto ni spec nueva). | La spec 001 pasa a **v1.3** con 94 RF; `spec.md`, `plan.md` y `tasks.md` se actualizan dentro de `specs/`.                                      |
+| D-2 | **20 filas por página** en ambos paneles (Formatos y Centros de Coste).       | Coherente con RF-UI-LIN-1.1 (líneas, 20/página) y RF-CC-1.6 (API de centros, 20/página).                                                        |
+| D-3 | No cambiar el contrato de la API ni los RF existentes.                        | El backend ya paginaba por cursor; la UI ahora consume ese cursor. Los selects de formato siguen recibiendo el catálogo completo (`limit=100`). |
+
+### RFs nuevos del delta v1.3
+
+| Grupo    | IDs                 | Qué exige                                                                                                                                                                                                                                                                                                                                                                                |
+| -------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CAT**  | RF-CAT-1.1 … 1.9    | Tabla de Formatos y Centros de Coste paginadas a **20 filas/página** con cursor; «Siguiente/Anterior» envía `after_id` + `c`; cambiar filtro u orden **reinicia** la paginación; los **selects de formato** siguen recibiendo el catálogo completo (`limit=100`, no se vacían al paginar); estado vacío/<20 filas deshabilita controles; coherente con RF-FMT-1.3, RF-ORD-1.4, RF-CC-1.6 |
+| **QUAL** | RF-QUAL-1.13 … 1.16 | E2E: 2ª página de Formatos y de Centros muestra filas distintas; los selects de formato no se vacían al paginar; aplicar/limpiar filtros en centros reinicia la paginación                                                                                                                                                                                                               |
+
+### Archivos tocados
+
+- **SPA (`presentation/`)**: `hooks/useFormatos.ts` (useFormatos paginado + useFormatosCatalogo para selects), `hooks/useCentrosCoste.ts` (paginado, reinicio por filtros), `components/catalogos/FormatosPanel.tsx` (tabla paginada con Anterior/Siguiente, pila de cursores), `components/catalogos/CentrosCostePanel.tsx` (tabla paginada, reinicio al aplicar/limpiar filtros, select de formato usa catálogo completo).
+- **Tests E2E**: `tests/e2e/formatos-paginacion.spec.ts` (nuevo, RF-QUAL-1.13/1.15), `tests/e2e/centros-paginacion.spec.ts` (nuevo, RF-QUAL-1.14/1.16), `tests/e2e/centros-paginacion-api.spec.ts` (nuevo en T-25, página 2 de centros).
+- **Documentación**: `specs/001-gestion-lineas-telefonicas/{spec.md,plan.md,tasks.md}` (delta v1.3: §5.10, §9.2, §10.1/§10.2; plan §E; tareas T-23…T-31).
+
+### Comandos verificados
+
+| Comando                                                  | Resultado                                                                                                             |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `pnpm --dir presentation typecheck`                      | exit 0 (sin errores)                                                                                                  |
+| `pnpm --dir presentation build`                          | exit 0 (115 módulos)                                                                                                  |
+| `pnpm test`                                              | 21 archivos / 446 tests OK                                                                                            |
+| `pnpm test:e2e`                                          | 32 tests OK (incluidos `formatos-paginacion.spec.ts`, `centros-paginacion.spec.ts`, `centros-paginacion-api.spec.ts`) |
+| `pnpm exec prettier --check "specs/**/*.md" "MEMORY.md"` | exit 0 (All matched files use Prettier code style!)                                                                   |
+| `pnpm lint`                                              | exit 0 (tras corregir un error pre-existing de T-25 en centros-paginacion-api.spec.ts)                                |
+| `pnpm typecheck` (raíz)                                  | exit 0                                                                                                                |
+| `pnpm build` (raíz)                                      | exit 0                                                                                                                |
+
+**Nota sobre `pnpm format:check` completo**: exit 1 por 2 ficheros `.tsx` de `presentation/` (`CentrosCostePanel.tsx`, `FormatosPanel.tsx`) modificados durante el delta y aún no formateados con Prettier. Quedan pendientes de `pnpm exec prettier --write` sobre esos 2 ficheros (fuera del alcance de T-29, que solo cubre `.md` de `specs/`).
+
+### Pruebas de no vacuidad
+
+Los tests E2E de T-27 y T-28 fueron verificados con mutación implícita: crear 25 formatos/centros forzó la existencia de página 2 (con 9 formatos preexistentes, `limit=20` cabría todo en una página y el test no distinguiría paginación real). Los tests de RF-QUAL-1.16 (aplicar/limpiar filtros → página 1) verifican que el cursor se reinicia correctamente.

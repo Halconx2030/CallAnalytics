@@ -1,10 +1,12 @@
 # Spec 001 — Gestión de Líneas Telefónicas
 
-**Estado**: aprobado (v1.2 — delta de cierre de deuda técnica)
-**Versión**: 1.2
-**Fecha**: 2026-11-04
-**Fecha de aprobación**: 2026-11-04
-**Fecha de actualización**: 2026-11-05
+**Estado**: borrador (delta v1.3 sobre v1.2, pendiente de aprobación del usuario)
+**Versión**: 1.3
+**Fecha**: 2026-11-06
+**Fecha de aprobación**: pendiente (delta v1.3)
+**Fecha de actualización**: 2026-11-06
+
+> **Remisión**: delta **v1.3** «Paginación de la UI en catálogos (Formatos y Centros de Coste)» sobre la spec 001 v1.2 (81 RF, cerrada el 2026-11-05). Este delta **no reescribe ni contradice** los 81 RF existentes: solo añade requisitos nuevos (capability CAT y cobertura QUAL).
 
 ---
 
@@ -16,18 +18,19 @@ La organización necesita un sistema centralizado para gestionar el inventario d
 
 ## 2. Qué incluye esta spec
 
-| Capability                    | Descripción                                                                                                                                                                                                                                                             |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Formatos**                  | Catálogo de formatos (ej: "SMU", "FALABELLA") referenciados por centros de coste                                                                                                                                                                                        |
-| **Centros de Coste**          | Gestión y importación masiva (codigo único, nombre, formato_id)                                                                                                                                                                                                         |
-| **Líneas Telefónicas**        | CRUD completo con campos: numero (único, normalizado chileno), proveedor, centro_coste_id (FK obligatorio), fecha_asignacion, costo_mensual, tipo_linea (movil/fijo), empleado (opcional), estado (activa/baja/pendiente/portabilidad), tipo_uso (personal/geovictoria) |
-| **Importación de Líneas**     | CSV/Excel con cabeceras; inserta solo nuevas por número único; reporta duplicados; permite crear línea solo con número                                                                                                                                                  |
-| **Dashboard Principal**       | Sidebar izquierda con KPIs: Total líneas, Líneas activas, Count Personal, Count Geovictoria                                                                                                                                                                             |
-| **Módulo Líneas (UI)**        | Tabla paginada (20 filas/página), filtros por columna, CRUD completo, cambio estado masivo                                                                                                                                                                              |
-| **Módulo Importación (UI)**   | Dos secciones: Importar Centros de Coste \| Importar Líneas; validación y reporte de resultados                                                                                                                                                                         |
-| **Validación número chileno** | Normalización a estándar: +56 9 XXXX XXXX (móvil) / +56 XX XXXX XXXX (fijo)                                                                                                                                                                                             |
-| **Exportación (EXP)**         | Generación de reportes CSV/Excel de líneas, centros de coste y formatos con filtros aplicados                                                                                                                                                                           |
-| **Cierre de deuda técnica**   | Precisiones de ordenamiento (RF-FMT-1.3, RF-LIN-1.9), bloqueo optimista por `If-Match`, cobertura de las 13 ramas pendientes y enforcement del umbral de cobertura en CI (§5.9)                                                                                         |
+| Capability                        | Descripción                                                                                                                                                                                                                                                                       |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Formatos**                      | Catálogo de formatos (ej: "SMU", "FALABELLA") referenciados por centros de coste                                                                                                                                                                                                  |
+| **Centros de Coste**              | Gestión y importación masiva (codigo único, nombre, formato_id)                                                                                                                                                                                                                   |
+| **Líneas Telefónicas**            | CRUD completo con campos: numero (único, normalizado chileno), proveedor, centro_coste_id (FK obligatorio), fecha_asignacion, costo_mensual, tipo_linea (movil/fijo), empleado (opcional), estado (activa/baja/pendiente/portabilidad), tipo_uso (personal/geovictoria)           |
+| **Importación de Líneas**         | CSV/Excel con cabeceras; inserta solo nuevas por número único; reporta duplicados; permite crear línea solo con número                                                                                                                                                            |
+| **Dashboard Principal**           | Sidebar izquierda con KPIs: Total líneas, Líneas activas, Count Personal, Count Geovictoria                                                                                                                                                                                       |
+| **Módulo Líneas (UI)**            | Tabla paginada (20 filas/página), filtros por columna, CRUD completo, cambio estado masivo                                                                                                                                                                                        |
+| **Módulo Importación (UI)**       | Dos secciones: Importar Centros de Coste \| Importar Líneas; validación y reporte de resultados                                                                                                                                                                                   |
+| **Validación número chileno**     | Normalización a estándar: +56 9 XXXX XXXX (móvil) / +56 XX XXXX XXXX (fijo)                                                                                                                                                                                                       |
+| **Exportación (EXP)**             | Generación de reportes CSV/Excel de líneas, centros de coste y formatos con filtros aplicados                                                                                                                                                                                     |
+| **Cierre de deuda técnica**       | Precisiones de ordenamiento (RF-FMT-1.3, RF-LIN-1.9), bloqueo optimista por `If-Match`, cobertura de las 13 ramas pendientes y enforcement del umbral de cobertura en CI (§5.9)                                                                                                   |
+| **Paginación UI catálogos (CAT)** | Tabla de **Formatos** y tabla de **Centros de Coste** paginadas a 20 filas/página con cursor (`{ v, id, c }`); desplegables de formato con el catálogo completo (independientes de la página visible); reinicio del cursor al cambiar filtros/orden y al aplicar/limpiar filtros. |
 
 ---
 
@@ -388,6 +391,26 @@ ALTER TABLE lineas_telefonicas ADD CONSTRAINT chk_costo_positivo
 > ejercitan la interfaz real. Queda registrado como **deuda futura** (dotar a `presentation/` de runner de tests unitarios y
 > su propio umbral), fuera del alcance de esta spec.
 
+### 5.10 Capability: Paginación de la UI en catálogos (CAT) — NUEVO (v1.3)
+
+| ID           | Requisito (EARS)                                                                                                                                                                                                                                                                                                                                                |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RF-CAT-1.1   | LA TABLA del panel de **Formatos** DEBE paginar a **20 filas por página**: solicita `limit=20` a `GET /api/v1/formatos` con el cursor de la página actual y muestra solo esa página; si quedan menos de 20 filas, muestra solo esas filas.                                                                                                                      |
+| RF-CAT-1.2   | LA TABLA de Formatos DEBE paginar sobre el orden vigente `nombre ASC, id ASC` (cursor sobre `nombre`, con `id` como desempate), coherente con RF-FMT-1.3 y RF-ORD-1.4; la API sigue devolviendo el listado de formatos ordenado por `nombre` (ver nota de cumplimiento más abajo).                                                                              |
+| RF-CAT-1.3   | CUANDO el usuario pulsa «Siguiente» o «Anterior», LA INTERFAZ DEBE enviar el cursor de la página actual (`after_id` con la columna de orden `c`) manteniendo los mismos filtros y orden, y DEBE deshabilitar «Siguiente» cuando la respuesta no traiga `next_cursor` (última página).                                                                           |
+| RF-CAT-1.4   | LA TABLA del panel de **Centros de Coste** DEBE paginar a **20 filas por página**: solicita `limit=20` con el cursor de la página actual y aplica los filtros vigentes (`codigo`, `nombre`, `formato_id`, `busqueda`), coherente con RF-CC-1.6.                                                                                                                 |
+| RF-CAT-1.5   | CUANDO el usuario pulsa «Aplicar filtros» o «Limpiar» en Centros de Coste, LA INTERFAZ DEBE reiniciar la paginación a la primera página (sin `after_id`) con los nuevos filtros (o sin filtros).                                                                                                                                                                |
+| RF-CAT-1.6   | CUANDO el usuario cambia el orden o un filtro en cualquiera de las dos tablas, LA INTERFAZ DEBE reiniciar el cursor a la primera página; CUANDO solo cambia de página, DEBE avanzar el cursor manteniendo filtros, orden y columna de orden del cursor (`c`).                                                                                                   |
+| RF-CAT-1.7   | **Independencia de los desplegables**: los selects de formato (formulario de centro de coste, filtro de centros de coste y filtro de líneas) DEBE seguir recibiendo el catálogo completo de formatos (hasta `limit=100`), con independencia de la página visible en la tabla de Formatos; la paginación de la tabla DEBE no vaciar ni truncar los desplegables. |
+| RF-CAT-1.8   | **Estado vacío / menos de 20 filas**: CUANDO el catálogo (o el resultado filtrado) tiene menos de 20 filas —incluido cero filas—, LA INTERFAZ DEBE mostrar las filas disponibles, DESHABILITAR «Siguiente» (ausencia de `next_cursor`) y NO mostrar «Anterior» en la primera página.                                                                            |
+| RF-CAT-1.9   | **Coherencia de orden y cursor**: la tabla de Formatos DEBE ordenar por `nombre ASC` y la de Centros de Coste DEBE usar el orden y filtros vigentes de su endpoint; al cambiar de página se conserva la columna de orden del cursor (`c`) y la API responde 400 ante un cursor de otra columna o legado (RF-ORD-1.4, patrón de Líneas T-13).                    |
+| RF-QUAL-1.13 | LA SUITE E2E DEBE verificar que la segunda página del panel de **Formatos** muestra un conjunto de filas distinto del de la primera página (RF-CAT-1.1, RF-CAT-1.3).                                                                                                                                                                                            |
+| RF-QUAL-1.14 | LA SUITE E2E DEBE verificar que la segunda página del panel de **Centros de Coste** muestra un conjunto de filas distinto del de la primera página (RF-CAT-1.4, RF-CAT-1.3).                                                                                                                                                                                    |
+| RF-QUAL-1.15 | LA SUITE E2E DEBE verificar que los selects de formato (formulario de centro de coste, filtro de centros de coste y filtro de líneas) NO se vacían al paginar la tabla de Formatos (RF-CAT-1.7).                                                                                                                                                                |
+| RF-QUAL-1.16 | LA SUITE E2E DEBE verificar que aplicar o limpiar filtros en Centros de Coste reinicia la paginación a la primera página (RF-CAT-1.5).                                                                                                                                                                                                                          |
+
+> **Nota (RF-FMT-1.3, cumplimiento v1.3)**: RF-FMT-1.3 ya exigía "listar todos los Formatos ordenados por `nombre`". Ese requisito rige el endpoint `GET /api/v1/formatos`, que sigue devolviendo el listado completo ordenado por `nombre ASC`, paginado por cursor sobre `nombre` (RF-ORD-1.4). La paginación de la tabla de la UI a 20 filas por página (RF-CAT-1.1) solo cambia cuántas filas pinta la interfaz por pantalla; no elimina ni reordena el listado de la API, por lo que no contradice RF-FMT-1.3.
+
 ---
 
 ## 6. Preguntas Abiertas — RESUELTAS
@@ -476,6 +499,14 @@ Informe completo: [`validation.md`](./validation.md)
   cobertura (QUAL) + 3 RF de CI (CI) + 2 RF de validación (VAL) = **81 RF**.
 - **Pendiente**: ninguno. **No quedan preguntas abiertas ni bloqueantes**; la spec puede pasar a la fase Plan.
 
+### 9.2 Delta v1.3 — Paginación de la UI en catálogos (Formatos y Centros de Coste) (2026-11-06)
+
+- **Motivo**: el usuario pide paginar las tablas de los paneles «Formatos de centro de coste» y «Centros de coste» a 20 filas por página, replicando el patrón de cursor ya usado en el módulo Líneas (T-13).
+- **Alcance**: solo la SPA (`presentation/`): tablas de Formatos y Centros de Coste paginadas a 20/página con cursor `{ v, id, c }`, reinicio de cursor al cambiar filtros/orden (y al aplicar/limpiar filtros en centros), independencia de los desplegables de formato (catálogo completo, `limit=100`), comportamiento con menos de 20 filas y coherencia de orden.
+- **Naturaleza**: **funcionalidad nueva de UI**. **No cambia el contrato de la API** ni los 81 RF existentes: RF-FMT-1.3, RF-CC-1.6 y RF-UI-LIN-1.1 se referencean sin reescribir; los endpoints ya entregan paginación por cursor (RF-CC-1.6: 20/página en la API; RF-ORD-1.4: formatos con cursor sobre `nombre`).
+- **Conteo**: se añaden 9 RF de la nueva capability **CAT** (RF-CAT-1.1 … RF-CAT-1.9) y 4 RF de cobertura **QUAL** (RF-QUAL-1.13 … RF-QUAL-1.16) → **81 + 13 = 94 RF**.
+- **Verificación**: pendiente de ejecución del plan y las tareas del delta (tests E2E por RF-QUAL-1.13 a RF-QUAL-1.16).
+
 ---
 
 ## 10. Decisiones tomadas en el delta v1.1/v1.2 (2026-11-05)
@@ -494,3 +525,22 @@ Informe completo: [`validation.md`](./validation.md)
 > **Consecuencias de estas decisiones sobre los RFs**: RF-ORD-1.2 y RF-ORD-1.5 (conjunto de 9 columnas y exclusión de
 > `empleado`), RF-CI-1.1, RF-CI-1.2 y RF-CI-1.3 (alcance `src/**`, umbrales globales 80/80/80/70, SPA fuera) y RF-VAL-1.5
 > (resolución confirmada). Ninguna decisión altera el comportamiento ya implementado.
+
+---
+
+### 10.1 Decisiones del usuario en el delta v1.3 (2026-11-06)
+
+| #   | Decisión                                                                                                                                                                                                                 | Impacto                                                                                                                        |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| D-1 | **Tramitación**: el delta va como **delta v1.3 de la spec 001** (no como spec nueva), decisión del usuario.                                                                                                              | Se añade a `specs/001-gestion-lineas-telefonicas/spec.md` sin reescribir ni contradecir los 81 RF existentes.                  |
+| D-2 | **Filas por página**: **20 filas por página** en ambos paneles (Formatos y Centros de Coste), decisión del usuario.                                                                                                      | Fija RF-CAT-1.1 y RF-CAT-1.4; igual que Líneas (RF-UI-LIN-1.1) y la API (RF-CC-1.6).                                           |
+| D-3 | **Contrato de API y RFs existentes**: el delta **no cambia** el contrato de la API ni modifica RF existente alguno; es funcionalidad nueva de UI sobre endpoints que ya entregan cursor y 20/página.                     | 0 RFs existentes modificados ni renumerados. `plan.md` y `tasks.md` **no se tocan** hasta que el usuario apruebe este delta.   |
+| D-4 | **Truncado de selects con más de 100 formatos**: el delta **no aborda** el truncado preexistente (los selects siguen pidiendo `limit=100`, el máximo del schema HTTP). Se documenta como deuda y pregunta abierta (P-1). | Ningún cambio en `useFormatos` ni en los selects; el delta solo exige que la paginación de la tabla no los vacíe (RF-CAT-1.7). |
+
+### 10.2 Preguntas abiertas del delta v1.3
+
+| #   | Pregunta                                                                                                                                                                                                                           | ¿Por qué está abierta?                                                                                                                                                                                             |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P-1 | ¿Se aborda en un delta posterior el truncado de los selects de formato cuando el catálogo supera 100 entradas (p. ej. búsqueda server-side tipo combobox de centros de coste)?                                                     | Hoy los selects piden `limit=100` (máximo del schema HTTP); con más de 100 formatos se truncan. Es deuda preexistente, no introducida por este delta, y el usuario no pidió cambiarla. No se resuelve en silencio. |
+| P-2 | ¿Se confirma que RF-FMT-1.3 («listar todos los Formatos ordenados por `nombre`») rige el **contrato de la API** (ya cumplido: endpoint ordenado por `nombre`) y no obliga a la tabla de la UI a pintar todas las filas de una vez? | La nota de cumplimiento en §5.10 aclara que no hay contradicción, pero conviene confirmar la interpretación con el PO antes de implementar.                                                                        |
+| P-3 | ¿Qué columna de orden usa por defecto `GET /api/v1/centros-coste` para su cursor (`created_at`, según T-11), y debe declararse explícitamente en la spec?                                                                          | El código usa `created_at` (T-11), pero la spec no lo declara para centros; RF-CAT-1.4 se refiere genéricamente al «orden vigente». Confirmar en el plan para que el RF sea totalmente verificable.                |

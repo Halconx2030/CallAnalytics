@@ -1,9 +1,10 @@
 import { useState } from 'react';
 
 import { useCentroCosteMutaciones, useCentrosCoste } from '../../hooks/useCentrosCoste';
-import { useFormatos } from '../../hooks/useFormatos';
+import { useFormatosCatalogo } from '../../hooks/useFormatos';
 import { Button } from '../base/Button';
 import { Input } from '../base/Input';
+import { Pagination } from '../base/Pagination';
 import { Select } from '../base/Select';
 import { Table } from '../base/Table';
 import { CentroCosteFormModal } from './CentroCosteFormModal';
@@ -21,15 +22,32 @@ const FILTROS_VACIOS: FiltrosCentro = { codigo: '', nombre: '', formato_id: '' }
 
 /** Panel de CRUD de centros de coste (RF-CC-1.1 a RF-CC-1.6). */
 export function CentrosCostePanel() {
-  const { data: formatos } = useFormatos();
+  const { data: formatos } = useFormatosCatalogo();
   const [filtros, setFiltros] = useState<FiltrosCentro>(FILTROS_VACIOS);
   const [filtrosAplicados, setFiltrosAplicados] = useState<FiltrosCentro>(FILTROS_VACIOS);
+  /**
+   * Pila de cursores por página visitada. `cursores[0]` es `undefined` (página 1,
+   * sin `after_id`). Al pulsar «Siguiente» se apila el `next_cursor` de la página
+   * actual; «Anterior» solo mueve el índice y reusa el cursor ya guardado.
+   * «Aplicar filtros» y «Limpiar» reinician la pila a `[undefined]` (RF-CAT-1.5).
+   */
+  const [cursores, setCursores] = useState<ReadonlyArray<string | undefined>>([undefined]);
+  const [indicePagina, setIndicePagina] = useState(0);
+  const cursor = cursores[indicePagina];
 
-  const { data: centros, isLoading } = useCentrosCoste({
-    codigo: filtrosAplicados.codigo,
-    nombre: filtrosAplicados.nombre,
-    formato_id: filtrosAplicados.formato_id,
-  });
+  const {
+    data: pagina,
+    isLoading,
+    refetch,
+  } = useCentrosCoste(
+    {
+      codigo: filtrosAplicados.codigo,
+      nombre: filtrosAplicados.nombre,
+      formato_id: filtrosAplicados.formato_id,
+    },
+    { afterId: cursor }
+  );
+  const centros = pagina?.items ?? [];
   const { crear, actualizar, eliminar } = useCentroCosteMutaciones();
 
   const [abierto, setAbierto] = useState(false);
@@ -83,6 +101,26 @@ export function CentrosCostePanel() {
     } catch (fallo) {
       setError(fallo instanceof Error ? fallo.message : 'No se pudo eliminar el centro de coste');
     }
+  };
+
+  const reiniciarPaginacion = () => {
+    setCursores([undefined]);
+    setIndicePagina(0);
+  };
+
+  const irAAnterior = () => {
+    setIndicePagina((actual) => Math.max(0, actual - 1));
+  };
+
+  const irASiguiente = () => {
+    const siguiente = pagina?.next_cursor ?? null;
+
+    if (siguiente === null || pagina?.has_next_page !== true) {
+      return;
+    }
+
+    setCursores((previos) => [...previos.slice(0, indicePagina + 1), siguiente]);
+    setIndicePagina((actual) => actual + 1);
   };
 
   const nombreDeFormato = (formatoId: string) =>
@@ -158,11 +196,19 @@ export function CentrosCostePanel() {
             onClick={() => {
               setFiltros(FILTROS_VACIOS);
               setFiltrosAplicados(FILTROS_VACIOS);
+              reiniciarPaginacion();
             }}
           >
             Limpiar
           </Button>
-          <Button onClick={() => setFiltrosAplicados(filtros)}>Aplicar filtros</Button>
+          <Button
+            onClick={() => {
+              setFiltrosAplicados(filtros);
+              reiniciarPaginacion();
+            }}
+          >
+            Aplicar filtros
+          </Button>
         </div>
       </div>
 
@@ -170,10 +216,21 @@ export function CentrosCostePanel() {
 
       <Table
         columnas={columnas}
-        filas={centros ?? []}
+        filas={centros}
         claveFila={(centro) => centro.id}
         cargando={isLoading}
         vacio="Aún no hay centros de coste creados"
+      />
+
+      <Pagination
+        paginaActual={indicePagina + 1}
+        totalPaginas={cursores.length}
+        onCambioPagina={irAAnterior}
+        onSiguiente={irASiguiente}
+        haySiguiente={pagina?.has_next_page === true}
+        onRecargar={() => {
+          void refetch();
+        }}
       />
 
       <CentroCosteFormModal

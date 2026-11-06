@@ -714,4 +714,67 @@ y `pnpm build`. No se genera ninguna migración (`pnpm db:generate` responde "No
 - (d) RF-CI-1.1, RF-CI-1.2, RF-CI-1.3 → D.2.4.
 - RF-VAL-1.4 y RF-VAL-1.5 → D.2.3 (unitarios de T-14).
 
-**Aprobación**: aprobado (2026-11-05)
+---
+
+## Plan del delta v1.3 — Paginación de UI en catálogos (2026-11-06)
+
+**Base**: `spec.md` **v1.3, aprobada** («Paginación de la UI en catálogos (Formatos y Centros de Coste)»). Este anexo añade las secciones §E.1 a §E.4 al plan original sin reescribirlas. **No hay migraciones, ni cambios de esquema, ni cambios de contrato de API**: el delta es funcionalidad nueva de SPA sobre endpoints que ya entregan cursor y `limit` 1..100 (T-11/T-12).
+
+### E.1 Objetivo y alcance
+
+- **(a) Formatos** — RF-CAT-1.1, 1.3, 1.8, 1.9: la tabla del panel de Formatos se pagina a **20 filas por página** sobre `nombre ASC, id ASC` (cursor sobre `nombre`, `id` como desempate, coherente con RF-FMT-1.3 y RF-ORD-1.4), con controles «Anterior»/«Siguiente»; «Siguiente» se deshabilita cuando la respuesta no trae `next_cursor` y «Anterior» en la página 1.
+- **(b) Centros de Coste** — RF-CAT-1.4, 1.5, 1.8: la tabla del panel de Centros de Coste se pagina a **20 filas por página** con los filtros vigentes (`codigo`, `nombre`, `formato_id`, `busqueda`, coherente con RF-CC-1.6); «Aplicar filtros» y «Limpiar» reinician la paginación a la primera página (sin `after_id`).
+- **(c) Hooks** — RF-CAT-1.1, 1.4, 1.6, 1.7: `useFormatos()` paginado (20/página, cursor, reinicio al cambiar orden); nuevo `useFormatosCatalogo()` con `limit=100` sin cursor para los **selects de formato** (formulario de centro de coste, filtro de centros de coste y filtro de líneas), independientes de la página visible de la tabla; `useCentrosCoste(filtros)` paginado (20/página, cursor) con reinicio al cambiar filtros.
+- **(d) UI** — RF-CAT-1.6, 1.8, 1.9: al cambiar orden o filtro se reinicia el cursor a la primera página; al solo cambiar de página se avanza el cursor conservando la columna de orden del cursor (`c`); con menos de 20 filas (incluido cero) se muestran solo las disponibles, «Siguiente» deshabilitado y sin «Anterior» en la página 1.
+- **Fuera de alcance**: truncado de selects cuando el catálogo supere 100 entradas (pregunta abierta P-1 del delta), interpretación de RF-FMT-1.3 sobre la UI (P-2), y runner de tests unitarios de la SPA (Q3 de v1.2: la SPA se cubre con E2E de Playwright).
+
+### E.2 Diseño técnico
+
+#### E.2.1 Hooks (`presentation/src/hooks/`)
+
+No hay cambios de backend: se reutilizan `GET /api/v1/formatos` (orden `nombre ASC`, cursor sobre `nombre`, T-11) y `GET /api/v1/centros-coste` (cursor sobre `created_at`, T-11; filtros `codigo`/`nombre`/`formato_id`/`busqueda`). El schema HTTP ya limita `limit` a 1..100 y rechaza cursores legacy o de otra columna con 400 (RFC 7807).
+
+- `useFormatos({ limite = 20, orden = 'nombre', direccion = 'asc' } = {})`: devuelve `Pagina<Formato>`; solicita `limit=20` con `after_id` del cursor de la página activa; al cambiar `orden` o `direccion` reinicia `after_id` (vuelve a página 1).
+- `useFormatosCatalogo()`: `limit=100`, sin `after_id`, sin cursor; devuelve el catálogo completo para los `select` de formato (RF-CAT-1.7, RF-QUAL-1.15).
+- `useCentrosCoste(filtros, { limite = 20 } = {})`: `limit=20` + filtros + `after_id`; como la clave de consulta de TanStack Query incluye los filtros, al cambiar cualquiera (o al limpiar) se consulta la primera página sin `after_id` (RF-CAT-1.5, RF-CAT-1.6). `useBuscarCentrosCoste` se mantiene sin paginación (`limit=20`, buscador de sugerencias).
+- `useFormatoMutaciones` / `useCentroCosteMutaciones`: tras crear/editar/eliminar, invalidan ambas claves (paginado y catálogo) para mantener consistencia.
+
+#### E.2.2 Paneles (`presentation/src/components/catalogos/`)
+
+- `FormatosPanel`: tabla paginada con pila de cursores (patrón de `pages/Lineas.tsx`, T-13): array `cursores[]` + `indicePagina`; «Anterior» deshabilitado en `indicePagina === 0`; «Siguiente» deshabilitado cuando la respuesta no trae `next_cursor`; al solo cambiar de página se avanza el cursor conservando la columna de orden (`c`).
+- `CentrosCostePanel`: igual, más reinicio de cursores al pulsar «Aplicar filtros» o «Limpiar». El `Select` de formato (filtro de centros y modal de centro de coste) se alimenta con `useFormatosCatalogo()`: catálogo completo, no se vacía ni se trunca al paginar la tabla (RF-CAT-1.7).
+
+#### E.2.3 Consultas SQL y contrato API
+
+No se genera migración ni consulta SQL nueva: se reutilizan `FormatoRepository.listar()` (`ORDER BY nombre ASC, id ASC` con keyset `(nombre, id)`) y `CentroCosteRepository.listar()` (filtros dinámicos + keyset sobre `created_at`, RF-CC-1.6). El cursor viaja siempre con su columna `c`; `decodificarCursor(after_id, columnaEsperada)` exige coincidencia y responde 400 ante un cursor legacy o de otra columna. Alternativa descartada: aceptar cursores sin `c` (oculta el error de paginar por la columna equivocada, decisión D.3 del plan).
+
+#### E.2.4 Estrategia de tests del delta
+
+| Tipo              | Ubicación                                                                          | RFs cubiertos                  |
+| ----------------- | ---------------------------------------------------------------------------------- | ------------------------------ |
+| Unitarios de hook | `tests/unit/hooks/useFormatos.test.ts`, `tests/unit/hooks/useCentrosCoste.test.ts` | RF-CAT-1.1, 1.4, 1.6, 1.7      |
+| E2E UI            | `tests/e2e/formatos-paginacion.spec.ts`, `tests/e2e/centros-paginacion.spec.ts`    | RF-QUAL-1.13, 1.14, 1.15, 1.16 |
+
+Comandos de verificación: `pnpm test`, `pnpm test:e2e`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm build`, `pnpm --dir presentation typecheck`, `pnpm --dir presentation build`. `pnpm db:generate` debe responder «No schema changes, nothing to migrate».
+
+### E.3 Riesgos y mitigaciones
+
+| Riesgo                                         | Mitigación                                                                                                                                                                                                        |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cursor legacy o de otra columna → 400          | El cursor es opaco y efímero (solo memoria de la SPA); se reinicia al cambiar filtros/orden. Fallar rápido es preferible a paginar silenciosamente por la columna equivocada (decisión D.3).                      |
+| Selects de formato truncados a 100             | Deuda preexistente (P-1); no se resuelve en este delta. `useFormatosCatalogo()` sigue pidiendo `limit=100`, el máximo del schema HTTP.                                                                            |
+| Sin runner de unitarios en la SPA              | Q3 de v1.2: la SPA se cubre con E2E. El test unitario de hook de T-24/T-26 requiere añadir `@testing-library/react` + `jsdom` si el usuario lo aprueba; de lo contrario su conducta queda cubierta por T-27/T-28. |
+| Desincronía cursor/orden al cambiar de columna | Reinicio obligatorio de paginación (RF-CAT-1.6); la API rechaza con 400 el cursor de otra columna, por lo que el reinicio evita errores en pantalla.                                                              |
+
+### E.4 Orden de implementación y criterio de hecho
+
+Orden: **T-23** (hooks formatos) → **T-24** (panel formatos + unitario del hook) → **T-25** (hook centros + E2E segunda página) → **T-26** (panel centros + unitario del hook) → **T-27** (E2E formatos) → **T-28** (E2E centros) → **T-29** (formato de specs) → **T-30** (cierre en `MEMORY.md`) → **T-31** (verificación final). Las tareas de comportamiento van primero (hooks y paneles); las de cierre (formato, documentación, verificación completa) van al final.
+
+**Hecho cuando** pasan, sin errores: `pnpm test`, `pnpm test:e2e`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` (incluyendo `specs/**` y `MEMORY.md`), `pnpm build`, `pnpm --dir presentation typecheck`, `pnpm --dir presentation build` y `pnpm db:generate` («No schema changes»). No se genera ninguna migración.
+
+**Trazabilidad RF → parte del delta**:
+
+- RF-CAT-1.1 … RF-CAT-1.9 → E.2.1, E.2.2 (T-23…T-26)
+- RF-QUAL-1.13 … RF-QUAL-1.16 → E.2.4 (T-27…T-28)
+
+**Aprobación**: pendiente
