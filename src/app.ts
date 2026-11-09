@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import cors from '@fastify/cors';
@@ -32,6 +33,8 @@ export interface OpcionesBuildApp {
   db?: PostgresJsDatabase<typeof schema>;
   /** Desactiva el log estructurado (usado en los tests). */
   silencioso?: boolean;
+  /** Directorio de assets compilados de la SPA (`presentation/dist`), o `false` para desactivar. */
+  spaDistDir?: string | false;
 }
 
 /** Construye la instancia de Fastify con plugins, middlewares y rutas. */
@@ -87,8 +90,13 @@ export async function buildApp(opciones: OpcionesBuildApp = {}): Promise<Fastify
     },
   });
 
+  const spaDistDir =
+    opciones.spaDistDir === undefined
+      ? path.resolve(process.cwd(), 'presentation/dist')
+      : opciones.spaDistDir;
+
   registrarCorrelationId(app);
-  registrarManejadorErrores(app);
+  registrarManejadorErrores(app, spaDistDir);
 
   app.get('/openapi.json', () => app.swagger());
 

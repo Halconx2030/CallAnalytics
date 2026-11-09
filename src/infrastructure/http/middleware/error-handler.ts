@@ -1,5 +1,7 @@
 import { DomainError } from '@domain/errors/DomainError.js';
 
+import { intentarServirSpa } from '../plugins/spa-static.js';
+
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { ZodError } from 'zod';
 
@@ -159,8 +161,8 @@ function construirCuerpo(error: unknown, request: FastifyRequest): CuerpoError {
   };
 }
 
-/** Registra el manejador de errores y el de rutas no encontradas. */
-export function registrarManejadorErrores(app: FastifyInstance): void {
+/** Registra el manejador de errores y el de rutas no encontradas (con soporte opcional para SPA). */
+export function registrarManejadorErrores(app: FastifyInstance, spaDistDir?: string | false): void {
   app.setErrorHandler((error: unknown, request: FastifyRequest, reply: FastifyReply) => {
     const cuerpo = construirCuerpo(error, request);
 
@@ -179,7 +181,15 @@ export function registrarManejadorErrores(app: FastifyInstance): void {
     void reply.status(cuerpo.status).type('application/problem+json').send(cuerpo);
   });
 
-  app.setNotFoundHandler((request: FastifyRequest, reply: FastifyReply) => {
+  app.setNotFoundHandler(async (request: FastifyRequest, reply: FastifyReply) => {
+    if (typeof spaDistDir === 'string' && spaDistDir.length > 0) {
+      const servido = await intentarServirSpa(request, reply, spaDistDir);
+
+      if (servido) {
+        return;
+      }
+    }
+
     const cuerpo: CuerpoError = {
       type: `${BASE_TIPOS}/not-found`,
       title: 'Recurso no encontrado',
@@ -188,6 +198,6 @@ export function registrarManejadorErrores(app: FastifyInstance): void {
       instance: request.url,
     };
 
-    void reply.status(404).type('application/problem+json').send(cuerpo);
+    await reply.status(404).type('application/problem+json').send(cuerpo);
   });
 }

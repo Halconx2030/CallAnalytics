@@ -1,4 +1,7 @@
 node_modules
+presentation/node_modules
+.opencode
+.turbo
 dist
 coverage
 presentation/dist
@@ -10,6 +13,7 @@ test-results
 .env.*
 !.env.example
 *.log
+*.tsbuildinfo
 docs
 specs
 imports

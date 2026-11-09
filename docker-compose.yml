@@ -10,6 +10,7 @@ services:
       - '5432:5432'
     volumes:
       - datos-postgres:/var/lib/postgresql/data
+      - ./src/infrastructure/database/migrations/0000_initial_schema.sql:/docker-entrypoint-initdb.d/0000_initial_schema.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres -d telefono2']
       interval: 5s
@@ -28,9 +29,21 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/telefono2
       DATABASE_SSL: 'false'
       LOG_LEVEL: info
-      CORS_ORIGIN: http://localhost:5173
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
     ports:
       - '3000:3000'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3000/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
   datos-postgres:

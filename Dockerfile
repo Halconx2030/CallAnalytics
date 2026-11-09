@@ -21,13 +21,15 @@ RUN pnpm build && pnpm --dir presentation build
 FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
-    PORT=3000
+    PORT=3000 \
+    CORS_ORIGIN=http://localhost:3000
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate && addgroup -S app && adduser -S app -G app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY presentation/package.json ./presentation/
 RUN pnpm install --frozen-lockfile --prod --filter . && pnpm store prune
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/presentation/dist ./presentation/dist
+COPY --from=build /app/src/infrastructure/database/migrations ./src/infrastructure/database/migrations
 USER app
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
