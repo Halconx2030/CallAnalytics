@@ -5,7 +5,7 @@ import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
 import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
-import Fastify, { type FastifyInstance, type FastifyLoggerOptions } from 'fastify';
+import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import {
   jsonSchemaTransform,
   serializerCompiler,
@@ -35,8 +35,9 @@ export interface OpcionesBuildApp {
 
 /** Construye la instancia de Fastify con plugins, middlewares y rutas. */
 export async function buildApp(opciones: OpcionesBuildApp = {}): Promise<FastifyInstance> {
+  // Fastify 5 separa la configuración (`logger`) de una instancia ya creada (`loggerInstance`).
   const app = Fastify({
-    logger: opciones.silencioso ? false : (logger as FastifyLoggerOptions),
+    ...(opciones.silencioso ? { logger: false } : { loggerInstance: logger as FastifyBaseLogger }),
     ajv: {
       customOptions: {
         strict: true,
