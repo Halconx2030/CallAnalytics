@@ -47,8 +47,8 @@ export function useActualizarLinea() {
   const cliente = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, ...datos }: { id: string } & DatosLinea) =>
-      api.put<Linea>(`/lineas/${id}`, datos),
+    mutationFn: ({ id, version, ...datos }: { id: string; version?: number } & DatosLinea) =>
+      api.put<Linea>(`/lineas/${id}`, datos, version),
     onSuccess: async () => {
       await cliente.invalidateQueries({ queryKey: lineasKey });
     },
@@ -60,8 +60,8 @@ export function useCambiarEstadoLinea() {
   const cliente = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, estado }: { id: string; estado: EstadoLinea }) =>
-      api.patch<Linea>(`/lineas/${id}/estado`, { estado }),
+    mutationFn: ({ id, estado, version }: { id: string; estado: EstadoLinea; version?: number }) =>
+      api.patch<Linea>(`/lineas/${id}/estado`, { estado }, version),
     onSuccess: async () => {
       await cliente.invalidateQueries({ queryKey: lineasKey });
     },

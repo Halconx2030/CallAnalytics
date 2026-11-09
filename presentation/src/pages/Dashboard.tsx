@@ -63,11 +63,6 @@ export function Dashboard() {
           descripcion="Líneas de tipo geovictoria"
         />
       </div>
-
-      <p className="nota">
-        El módulo de líneas, sus filtros y la importación masiva se desarrollan en los pasos
-        siguientes (T-08 y T-09).
-      </p>
     </section>
   );
 }

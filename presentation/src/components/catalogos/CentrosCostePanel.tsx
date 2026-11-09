@@ -74,6 +74,7 @@ export function CentrosCostePanel() {
       } else {
         await actualizar.mutateAsync({
           id: enEdicion.id,
+          version: enEdicion.version,
           nombre: datos.nombre,
           formato_id: datos.formato_id,
         });
@@ -97,7 +98,7 @@ export function CentrosCostePanel() {
     }
 
     try {
-      await eliminar.mutateAsync(centro.id);
+      await eliminar.mutateAsync({ id: centro.id, version: centro.version });
       setError(undefined);
     } catch (fallo) {
       setError(fallo instanceof Error ? fallo.message : 'No se pudo eliminar el centro de coste');
@@ -225,8 +226,8 @@ export function CentrosCostePanel() {
 
       <Pagination
         paginaActual={indicePagina + 1}
-        totalPaginas={Math.ceil((pagina?.totalCount ?? 0) / LIMITE_PAGINA)}
-        totalRegistros={pagina?.totalCount ?? undefined}
+        totalPaginas={Math.ceil((pagina?.total_count ?? 0) / LIMITE_PAGINA)}
+        totalRegistros={pagina?.total_count ?? undefined}
         onCambioPagina={irAAnterior}
         onSiguiente={irASiguiente}
         haySiguiente={pagina?.has_next_page === true}

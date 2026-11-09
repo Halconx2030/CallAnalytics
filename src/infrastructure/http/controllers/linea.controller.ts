@@ -167,8 +167,12 @@ export class LineaController {
   }
 
   /** Cambia el estado de una línea (`RF-LIN-1.6`). */
-  async cambiarEstado(id: string, estado: 'activa' | 'baja' | 'pendiente' | 'portabilidad') {
-    return toLineaResponse(await this.service.cambiarEstado(id, estado));
+  async cambiarEstado(
+    id: string,
+    estado: 'activa' | 'baja' | 'pendiente' | 'portabilidad',
+    versionEsperada?: number
+  ) {
+    return toLineaResponse(await this.service.cambiarEstado(id, estado, versionEsperada));
   }
 
   /**

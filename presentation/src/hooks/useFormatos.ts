@@ -79,13 +79,14 @@ export function useFormatoMutaciones() {
   });
 
   const actualizar = useMutation({
-    mutationFn: ({ id, nombre }: { id: string; nombre: string }) =>
-      api.put<Formato>(`/formatos/${id}`, { nombre }),
+    mutationFn: ({ id, nombre, version }: { id: string; nombre: string; version?: number }) =>
+      api.put<Formato>(`/formatos/${id}`, { nombre }, version),
     onSuccess: invalidar,
   });
 
   const eliminar = useMutation({
-    mutationFn: (id: string) => api.delete<unknown>(`/formatos/${id}`),
+    mutationFn: ({ id, version }: { id: string; version?: number }) =>
+      api.delete<unknown>(`/formatos/${id}`, version),
     onSuccess: invalidar,
   });
 

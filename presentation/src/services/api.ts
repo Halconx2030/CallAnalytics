@@ -91,22 +91,27 @@ export const api = {
     });
   },
 
-  put<T>(path: string, cuerpo?: unknown): Promise<T> {
+  put<T>(path: string, cuerpo?: unknown, version?: number): Promise<T> {
     return request<T>(path, {
       method: 'PUT',
       ...(cuerpo === undefined ? {} : { body: JSON.stringify(cuerpo) }),
+      ...(version === undefined ? {} : { headers: { 'If-Match': String(version) } }),
     });
   },
 
-  patch<T>(path: string, cuerpo?: unknown): Promise<T> {
+  patch<T>(path: string, cuerpo?: unknown, version?: number): Promise<T> {
     return request<T>(path, {
       method: 'PATCH',
       ...(cuerpo === undefined ? {} : { body: JSON.stringify(cuerpo) }),
+      ...(version === undefined ? {} : { headers: { 'If-Match': String(version) } }),
     });
   },
 
-  delete<T>(path: string): Promise<T> {
-    return request<T>(path, { method: 'DELETE' });
+  delete<T>(path: string, version?: number): Promise<T> {
+    return request<T>(path, {
+      method: 'DELETE',
+      ...(version === undefined ? {} : { headers: { 'If-Match': String(version) } }),
+    });
   },
 
   /** Sube un archivo (multipart) a un endpoint de importación. */

@@ -5,7 +5,7 @@ export interface Pagina<T> {
   readonly items: T[];
   readonly next_cursor: string | null;
   readonly has_next_page: boolean;
-  readonly totalCount: number;
+  readonly total_count: number;
 }
 
 /** Formato de centro de coste. */
@@ -86,6 +86,8 @@ export type ColumnaOrdenLinea =
 
 /** Detalle de error de validación (RFC 7807). */
 export interface DetalleError {
+  readonly campo?: string;
+  readonly mensaje?: string;
   readonly path?: string;
   readonly message?: string;
   readonly [clave: string]: unknown;

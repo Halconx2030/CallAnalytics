@@ -172,7 +172,11 @@ export function Lineas() {
       if (lineaEnEdicion === null) {
         await crear.mutateAsync(datos);
       } else {
-        await actualizar.mutateAsync({ id: lineaEnEdicion.id, ...datos });
+        await actualizar.mutateAsync({
+          id: lineaEnEdicion.id,
+          version: lineaEnEdicion.version,
+          ...datos,
+        });
       }
 
       setModalAbierto(false);
@@ -184,7 +188,7 @@ export function Lineas() {
 
   const cambiarEstadoDe = async (linea: Linea, estado: EstadoLinea) => {
     try {
-      await cambiarEstado.mutateAsync({ id: linea.id, estado });
+      await cambiarEstado.mutateAsync({ id: linea.id, estado, version: linea.version });
       await refetch();
     } catch (fallo) {
       setErrorFormulario(mensajeError(fallo));
@@ -301,8 +305,8 @@ export function Lineas() {
 
       <Pagination
         paginaActual={indicePagina + 1}
-        totalPaginas={Math.ceil((data?.totalCount ?? 0) / LIMITE_PAGINA)}
-        totalRegistros={data?.totalCount ?? undefined}
+        totalPaginas={Math.ceil((data?.total_count ?? 0) / LIMITE_PAGINA)}
+        totalRegistros={data?.total_count ?? undefined}
         onCambioPagina={irAAnterior}
         onSiguiente={irASiguiente}
         haySiguiente={data?.has_next_page === true}

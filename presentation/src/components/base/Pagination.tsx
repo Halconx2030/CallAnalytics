@@ -30,7 +30,7 @@ export function Pagination({
         {totalRegistros === 0
           ? '0 registros'
           : totalRegistros !== undefined
-            ? `${totalRegistros} registro(s) · página ${paginaActual} de ${totalPaginas}`
+            ? `${totalRegistros} registro(s) · Página ${paginaActual} de ${totalPaginas}`
             : `Página ${paginaActual} de ${totalPaginas}`}
       </span>
 

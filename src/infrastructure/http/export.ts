@@ -40,6 +40,27 @@ export function nombreArchivoExport(
   return `${prefijo}_${marcaTiempo(fecha)}.${formato}`;
 }
 
+/**
+ * Neutraliza prefijos de fórmulas de hoja de cálculo (`=`, `+`, `-`, `@`, `\t`, `\r`)
+ * para evitar inyección de fórmulas al abrir el archivo en Excel o LibreOffice Calc,
+ * conservando intactos los teléfonos E.164 chilenos (`+56...`).
+ */
+export function sanitizarCeldaExport(valor: string | number | null | undefined): string | number {
+  if (valor === null || valor === undefined) {
+    return '';
+  }
+
+  if (typeof valor === 'number') {
+    return valor;
+  }
+
+  if (/^\+56\d{8,10}$/.test(valor)) {
+    return valor;
+  }
+
+  return /^[=+\-@\t\r]/.test(valor) ? `'${valor}` : valor;
+}
+
 /** Construye el archivo CSV (con BOM para que Excel respete UTF-8). */
 export function construirCsv(
   columnas: string[],
@@ -47,7 +68,7 @@ export function construirCsv(
 ): Buffer {
   const hoja = XLSX.utils.aoa_to_sheet([
     columnas,
-    ...filas.map((fila) => fila.map((v) => v ?? '')),
+    ...filas.map((fila) => fila.map((v) => sanitizarCeldaExport(v))),
   ]);
   const csv = XLSX.utils.sheet_to_csv(hoja, { FS: ',', RS: '\r\n' });
 
@@ -61,7 +82,7 @@ export function construirXlsx(
 ): Buffer {
   const hoja = XLSX.utils.aoa_to_sheet([
     columnas,
-    ...filas.map((fila) => fila.map((v) => v ?? '')),
+    ...filas.map((fila) => fila.map((v) => sanitizarCeldaExport(v))),
   ]);
   const libro = XLSX.utils.book_new();
 

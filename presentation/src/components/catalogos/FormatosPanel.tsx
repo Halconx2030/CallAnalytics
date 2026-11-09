@@ -65,7 +65,7 @@ export function FormatosPanel() {
       if (enEdicion === null) {
         await crear.mutateAsync(datos);
       } else {
-        await actualizar.mutateAsync({ id: enEdicion.id, ...datos });
+        await actualizar.mutateAsync({ id: enEdicion.id, version: enEdicion.version, ...datos });
       }
 
       setAbierto(false);
@@ -86,7 +86,7 @@ export function FormatosPanel() {
     }
 
     try {
-      await eliminar.mutateAsync(formato.id);
+      await eliminar.mutateAsync({ id: formato.id, version: formato.version });
       setError(undefined);
     } catch (fallo) {
       setError(fallo instanceof Error ? fallo.message : 'No se pudo eliminar el formato');
@@ -150,8 +150,8 @@ export function FormatosPanel() {
 
       <Pagination
         paginaActual={indicePagina + 1}
-        totalPaginas={Math.ceil((pagina?.totalCount ?? 0) / LIMITE_PAGINA)}
-        totalRegistros={pagina?.totalCount ?? undefined}
+        totalPaginas={Math.ceil((pagina?.total_count ?? 0) / LIMITE_PAGINA)}
+        totalRegistros={pagina?.total_count ?? undefined}
         onCambioPagina={irAAnterior}
         onSiguiente={irASiguiente}
         haySiguiente={pagina?.has_next_page === true}

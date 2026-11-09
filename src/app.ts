@@ -57,7 +57,7 @@ export async function buildApp(opciones: OpcionesBuildApp = {}): Promise<Fastify
 
   await app.register(cors, {
     origin: env.CORS_ORIGIN,
-    credentials: true,
+    credentials: false,
   });
 
   await app.register(multipart, {
@@ -76,15 +76,6 @@ export async function buildApp(opciones: OpcionesBuildApp = {}): Promise<Fastify
         version: '0.1.0',
       },
       servers: [{ url: `http://localhost:${env.PORT}`, description: 'Development server' }],
-      components: {
-        securitySchemes: {
-          bearerAuth: {
-            type: 'http',
-            scheme: 'bearer',
-            bearerFormat: 'JWT',
-          },
-        },
-      },
     },
   });
 

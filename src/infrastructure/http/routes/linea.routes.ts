@@ -113,7 +113,8 @@ export function registrarRutasLinea(app: FastifyInstance, controller: LineaContr
         response: { 200: lineaResponseSchema },
       },
     },
-    async (request) => controller.cambiarEstado(request.params.id, request.body.estado)
+    async (request) =>
+      controller.cambiarEstado(request.params.id, request.body.estado, versionEsperadaDe(request))
   );
 
   api.delete(

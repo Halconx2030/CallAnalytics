@@ -25,7 +25,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   HOST: z.string().default('0.0.0.0'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
-  CORS_ORIGIN: z.string().default('*'),
+  CORS_ORIGIN: z.string().default('http://localhost:5173'),
   DATABASE_URL: z.string().url().default('postgresql://postgres:postgres@localhost:5432/telefono2'),
   DATABASE_POOL_SIZE: z.coerce.number().default(10),
   DATABASE_SSL: booleanoEnv.default(false),

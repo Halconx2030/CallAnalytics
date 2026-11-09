@@ -1,4 +1,4 @@
-﻿import { z } from 'zod';
+import { z } from 'zod';
 
 import { formatoExportacionQuerySchema, paginaSchema, uuidSchema } from './comunes.js';
 
@@ -32,7 +32,12 @@ export const crearLineaBodySchema = z.object({
   fecha_asignacion: fechaSchema.optional(),
   costo_mensual: costoMensualSchema.optional(),
   tipo_linea: tipoLineaSchema.optional(),
-  empleado: z.string().trim().max(255).nullable().optional(),
+  empleado: z
+    .string()
+    .trim()
+    .max(100, 'El empleado no puede superar los 100 caracteres')
+    .nullable()
+    .optional(),
   estado: estadoLineaSchema.optional(),
   tipo_uso: tipoUsoSchema.optional(),
 });
@@ -45,7 +50,12 @@ export const actualizarLineaBodySchema = z.object({
   fecha_asignacion: fechaSchema.optional(),
   costo_mensual: costoMensualSchema.optional(),
   tipo_linea: tipoLineaSchema.optional(),
-  empleado: z.string().trim().max(255).nullable().optional(),
+  empleado: z
+    .string()
+    .trim()
+    .max(100, 'El empleado no puede superar los 100 caracteres')
+    .nullable()
+    .optional(),
   estado: estadoLineaSchema.optional(),
   tipo_uso: tipoUsoSchema.optional(),
 });

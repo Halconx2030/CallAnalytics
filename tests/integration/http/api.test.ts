@@ -1735,5 +1735,45 @@ describe('API HTTP de TELEFONO 2', () => {
         expect(resReady.json()).toMatchObject({ status: 'ok', database: 'up' });
       });
     });
+
+    describe('concurrencia optimista en PATCH /api/v1/lineas/:id/estado (RF-OPT-1.1)', () => {
+      it('devuelve 409 Conflict si If-Match no coincide con la versión actual', async () => {
+        const formatoId = await crearFormato('SMU');
+        const centroId = await crearCentroCoste(formatoId, '510', 'Centro 510');
+        const alta = await app.inject({
+          method: 'POST',
+          url: '/api/v1/lineas',
+          payload: {
+            numero: '+56988776655',
+            centro_coste_id: centroId,
+            estado: 'activa',
+          },
+        });
+        expect(alta.statusCode).toBe(201);
+        const linea = alta.json<{ id: string }>();
+
+        const resConflicto = await app.inject({
+          method: 'PATCH',
+          url: `/api/v1/lineas/${linea.id}/estado`,
+          headers: { 'if-match': '99' },
+          payload: { estado: 'pendiente' },
+        });
+
+        expect(resConflicto.statusCode).toBe(409);
+
+        const resExito = await app.inject({
+          method: 'PATCH',
+          url: `/api/v1/lineas/${linea.id}/estado`,
+          headers: { 'if-match': '1' },
+          payload: { estado: 'pendiente' },
+        });
+
+        expect(resExito.statusCode).toBe(200);
+        expect(resExito.json<{ version: number; estado: string }>()).toMatchObject({
+          version: 2,
+          estado: 'pendiente',
+        });
+      });
+    });
   });
 });

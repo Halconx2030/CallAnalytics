@@ -110,13 +110,22 @@ export function useCentroCosteMutaciones() {
   });
 
   const actualizar = useMutation({
-    mutationFn: ({ id, ...datos }: { id: string; nombre?: string; formato_id?: string }) =>
-      api.put<CentroCoste>(`/centros-coste/${id}`, datos),
+    mutationFn: ({
+      id,
+      version,
+      ...datos
+    }: {
+      id: string;
+      version?: number;
+      nombre?: string;
+      formato_id?: string;
+    }) => api.put<CentroCoste>(`/centros-coste/${id}`, datos, version),
     onSuccess: invalidar,
   });
 
   const eliminar = useMutation({
-    mutationFn: (id: string) => api.delete<unknown>(`/centros-coste/${id}`),
+    mutationFn: ({ id, version }: { id: string; version?: number }) =>
+      api.delete<unknown>(`/centros-coste/${id}`, version),
     onSuccess: invalidar,
   });
 
