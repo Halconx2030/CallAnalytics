@@ -16,6 +16,27 @@ const CAMPO_POR_CONSTRAINT: Record<string, string> = {
 };
 
 /**
+ * Localiza el error original de PostgreSQL. Desde drizzle-orm 0.45 las consultas fallidas se
+ * envuelven en un `DrizzleQueryError` y el error del driver queda en `cause`; se recorre la
+ * cadena (con tope) para seguir funcionando con ambos formatos.
+ */
+function extraerErrorPostgres(error: unknown): ErrorPostgres | null {
+  let actual: unknown = error;
+
+  for (let nivel = 0; nivel < 5 && typeof actual === 'object' && actual !== null; nivel += 1) {
+    const candidato = actual as ErrorPostgres & { cause?: unknown };
+
+    if (typeof candidato.code === 'string') {
+      return candidato;
+    }
+
+    actual = candidato.cause;
+  }
+
+  return null;
+}
+
+/**
  * Traduce los errores de PostgreSQL a errores de dominio, de modo que la capa HTTP no
  * tenga que conocer códigos SQL.
  *
@@ -32,7 +53,7 @@ export function mapearErrorPostgres(error: unknown): unknown {
     return error;
   }
 
-  const postgres = error as ErrorPostgres | null;
+  const postgres = extraerErrorPostgres(error);
 
   switch (postgres?.code) {
     case '23505': {
