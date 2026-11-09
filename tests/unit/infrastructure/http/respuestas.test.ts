@@ -17,10 +17,7 @@ function paginaDePrueba(totalCount: number): PaginaCursor<string> {
 
 describe('toPaginaResponse (delta v1.4)', () => {
   it('propaga total_count del dominio a la respuesta HTTP (RF-PAG-1.5)', () => {
-    const respuesta: PaginaResponse<string> = toPaginaResponse(
-      paginaDePrueba(57),
-      (item) => item,
-    );
+    const respuesta: PaginaResponse<string> = toPaginaResponse(paginaDePrueba(57), (item) => item);
 
     expect(respuesta.total_count).toBe(57);
   });

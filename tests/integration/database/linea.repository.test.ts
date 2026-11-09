@@ -154,15 +154,14 @@ describe('DrizzleLineaRepository (integración)', () => {
   });
 
   it('devuelve totalCount con el total de líneas activas que coinciden con los filtros', async () => {
+    await repo.crear(LineaTelefonica.crearLineaTelefonica({ numero: '900000001', centroCosteId }));
     await repo.crear(
-      LineaTelefonica.crearLineaTelefonica({ numero: '900000001', centroCosteId })
+      LineaTelefonica.crearLineaTelefonica({
+        numero: '900000002',
+        centroCosteId: otroCentroCosteId,
+      })
     );
-    await repo.crear(
-      LineaTelefonica.crearLineaTelefonica({ numero: '900000002', centroCosteId: otroCentroCosteId })
-    );
-    await repo.crear(
-      LineaTelefonica.crearLineaTelefonica({ numero: '900000003', centroCosteId })
-    );
+    await repo.crear(LineaTelefonica.crearLineaTelefonica({ numero: '900000003', centroCosteId }));
 
     const pagina = await repo.listar({ limit: 100 });
     expect(pagina.totalCount).toBe(3);

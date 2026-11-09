@@ -232,7 +232,7 @@ export class DrizzleLineaRepository implements LineaRepository {
 
     const totalCountRaw = filasCount[0]?.count;
     const totalCount =
-      typeof totalCountRaw === 'string' ? parseInt(totalCountRaw, 10) : totalCountRaw ?? 0;
+      typeof totalCountRaw === 'string' ? parseInt(totalCountRaw, 10) : (totalCountRaw ?? 0);
 
     const hasNextPage = filas.length > limit;
     const pagina = filas.slice(0, limit);
