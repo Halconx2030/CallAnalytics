@@ -140,5 +140,14 @@ describe('CentroCoste — conId y reconstitución', () => {
     expect(() => CentroCoste.reconstituirCentroCoste({ ...fila, codigo: '' })).toThrow(
       ValidationError
     );
+    expect(() => CentroCoste.reconstituirCentroCoste({ ...fila, id: '   ' })).toThrow(
+      ValidationError
+    );
+    expect(() => CentroCoste.reconstituirCentroCoste({ ...fila, version: 0 })).toThrow(
+      ValidationError
+    );
+    expect(() => CentroCoste.reconstituirCentroCoste({ ...fila, createdAt: 'invalida' })).toThrow(
+      ValidationError
+    );
   });
 });

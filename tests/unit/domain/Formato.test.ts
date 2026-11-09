@@ -108,6 +108,26 @@ describe('Formato — conId y reconstitución', () => {
         updatedAt: AHORA,
       })
     ).toThrow(ValidationError);
+
+    expect(() =>
+      Formato.reconstituirFormato({
+        id: '44444444-4444-4444-4444-444444444444',
+        nombre: 'SMU',
+        version: 0,
+        createdAt: AHORA,
+        updatedAt: AHORA,
+      })
+    ).toThrow(ValidationError);
+
+    expect(() =>
+      Formato.reconstituirFormato({
+        id: '44444444-4444-4444-4444-444444444444',
+        nombre: 'SMU',
+        version: 1,
+        createdAt: 'fecha-invalida',
+        updatedAt: AHORA,
+      })
+    ).toThrow(ValidationError);
   });
 
   it('expone el nombre recortado', () => {

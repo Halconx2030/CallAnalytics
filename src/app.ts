@@ -20,6 +20,7 @@ import { logger } from '@config/logger.js';
 import { crearContenedor } from './infrastructure/http/container.js';
 import { registrarManejadorErrores } from './infrastructure/http/middleware/error-handler.js';
 import { registrarCorrelationId } from './infrastructure/http/plugins/correlation-id.js';
+import { registrarRutasHealth } from './infrastructure/http/routes/health.routes.js';
 import { registrarRutas } from './infrastructure/http/routes/index.js';
 
 import type * as schema from './infrastructure/database/schema/index.js';
@@ -98,11 +99,10 @@ export async function buildApp(opciones: OpcionesBuildApp = {}): Promise<Fastify
   registrarCorrelationId(app);
   registrarManejadorErrores(app);
 
-  app.get('/health', () => ({ status: 'ok', timestamp: new Date().toISOString() }));
-
   app.get('/openapi.json', () => app.swagger());
 
   const contenedor = crearContenedor(opciones.db);
+  registrarRutasHealth(app, contenedor.pingDatabase);
   registrarRutas(app, contenedor);
 
   return app;

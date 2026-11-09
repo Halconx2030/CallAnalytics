@@ -1,4 +1,4 @@
-﻿import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx';
 
 import { buildApp } from '@/app.js';
 
@@ -1718,6 +1718,21 @@ describe('API HTTP de TELEFONO 2', () => {
         expect(
           formatos.json<{ items: { nombre: string }[] }>().items.map((item) => item.nombre)
         ).toEqual(['SMU']);
+      });
+    });
+
+    describe('endpoints de salud (/health, /health/live, /health/ready)', () => {
+      it('responde 200 en liveness y readiness con la base de datos activa', async () => {
+        const resHealth = await app.inject({ method: 'GET', url: '/health' });
+        const resLive = await app.inject({ method: 'GET', url: '/health/live' });
+        const resReady = await app.inject({ method: 'GET', url: '/health/ready' });
+
+        expect(resHealth.statusCode).toBe(200);
+        expect(resHealth.json()).toMatchObject({ status: 'ok' });
+        expect(resLive.statusCode).toBe(200);
+        expect(resLive.json()).toMatchObject({ status: 'ok' });
+        expect(resReady.statusCode).toBe(200);
+        expect(resReady.json()).toMatchObject({ status: 'ok', database: 'up' });
       });
     });
   });

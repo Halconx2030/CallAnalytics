@@ -1,3 +1,5 @@
+import { sql } from 'drizzle-orm';
+
 import { CentroCosteService } from '@application/services/centro-coste.service.js';
 import { DashboardService } from '@application/services/dashboard.service.js';
 import { FormatoService } from '@application/services/formato.service.js';
@@ -13,6 +15,7 @@ import { DrizzleUnidadDeTrabajo } from '@infrastructure/database/repositories/un
 import type * as schema from '@infrastructure/database/schema/index.js';
 import { XlsxParser } from '@infrastructure/external/spreadsheet/xlsx-parser.js';
 
+import type { PingDatabase } from './routes/health.routes.js';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 /** Servicios de la aplicación, listos para usar en los controladores HTTP. */
@@ -22,6 +25,7 @@ export interface Contenedor {
   lineaService: LineaService;
   dashboardService: DashboardService;
   importService: ImportService;
+  pingDatabase: PingDatabase;
 }
 
 /**
@@ -43,5 +47,8 @@ export function crearContenedor(db: PostgresJsDatabase<typeof schema> = dbPorDef
     lineaService: new LineaService(lineas, centrosCoste),
     dashboardService: new DashboardService(dashboard),
     importService: new ImportService(parser, formatos, centrosCoste, lineas, unidadDeTrabajo),
+    pingDatabase: async () => {
+      await db.execute(sql`SELECT 1`);
+    },
   };
 }

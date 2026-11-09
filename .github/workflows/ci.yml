@@ -40,6 +40,9 @@ jobs:
       - name: Instalar dependencias
         run: pnpm install --frozen-lockfile
 
+      - name: Auditoría de seguridad (dependencias de producción)
+        run: pnpm audit --prod --audit-level=high
+
       - name: Aplicar migraciones (base de pruebas)
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/telefono2_test
@@ -77,6 +80,26 @@ jobs:
 
       - name: Build SPA
         run: pnpm --dir presentation build
+
+  docker-security:
+    name: Seguridad de Imagen Docker (Trivy)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construir imagen Docker
+        run: docker build -t telefono-2:ci .
+
+      - name: Escanear imagen con Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: 'telefono-2:ci'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
 
   e2e:
     name: E2E (Playwright)
