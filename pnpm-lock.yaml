@@ -39,8 +39,8 @@ importers:
         specifier: ^5.12.8
         version: 5.12.8
       fastify-type-provider-zod:
-        specifier: 4.0.2
-        version: 4.0.2(fastify@5.12.8)(zod@3.25.76)
+        specifier: 7.0.0
+        version: 7.0.0(@fastify/swagger@9.9.3)(fastify@5.12.8)(openapi-types@12.1.3)(zod@4.6.7)
       pino:
         specifier: ^9.3.2
         version: 9.14.0
@@ -57,11 +57,8 @@ importers:
         specifier: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
         version: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
       zod:
-        specifier: ^3.23.8
-        version: 3.25.76
-      zod-to-json-schema:
-        specifier: ^3.23.0
-        version: 3.25.2(zod@3.25.76)
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
       '@playwright/test':
         specifier: ^1.47.2
@@ -2379,11 +2376,13 @@ packages:
   fastify-plugin@6.0.1:
     resolution: {integrity: sha512-4wW4RxSmvPXLrh5mgQEiu43qU3bw44N2ss4FTkTkQIbprUhE+/s43QX0j/ttcztdWK7PEkHqVthdc5GdEGDvjA==}
 
-  fastify-type-provider-zod@4.0.2:
-    resolution: {integrity: sha512-FDRzSL3ZuoZ+4YDevR1YOinmDKkxOdy3QB9dDR845sK+bQvDroPKhHAXLEAOObDxL7SMA0OZN/A4osrNBTdDTQ==}
+  fastify-type-provider-zod@7.0.0:
+    resolution: {integrity: sha512-yUEKMyy+kml+4fzUU9GxVtYVKmPKNFo8OVd2N/RH2I/7JZiKvOqF1BUj3f/JJU3DDQDM7pMv2bf/Y8COPaxUWg==}
     peerDependencies:
-      fastify: ^5.0.0
-      zod: ^3.14.2
+      '@fastify/swagger': '>=9.5.1'
+      fastify: ^5.5.0
+      openapi-types: ^12.1.3
+      zod: '>=4.1.5'
 
   fastify@5.12.8:
     resolution: {integrity: sha512-moP8exb2sCHLUbJkwp+I6C0padhy4D8lp0SdmzY7HhSdZuqm7O/u3o2aq7u8okaQ//33QDzj3G/u+FsSdB8Qzw==}
@@ -3781,13 +3780,11 @@ packages:
     resolution: {integrity: sha512-zK7YHHz4ZXpW89AHXUPbQVGKI7uvkd3hzusTdotCg1UxyaVtg0zFJSTfW/Dq5f7OBBVnq6cZIaC8Ti4hb6dtCA==}
     engines: {node: '>= 14'}
 
-  zod-to-json-schema@3.25.2:
-    resolution: {integrity: sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA==}
-    peerDependencies:
-      zod: ^3.25.28 || ^4
-
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
 snapshots:
 
@@ -5821,12 +5818,13 @@ snapshots:
 
   fastify-plugin@6.0.1: {}
 
-  fastify-type-provider-zod@4.0.2(fastify@5.12.8)(zod@3.25.76):
+  fastify-type-provider-zod@7.0.0(@fastify/swagger@9.9.3)(fastify@5.12.8)(openapi-types@12.1.3)(zod@4.6.7):
     dependencies:
       '@fastify/error': 4.2.1
+      '@fastify/swagger': 9.9.3
       fastify: 5.12.8
-      zod: 3.25.76
-      zod-to-json-schema: 3.25.2(zod@3.25.76)
+      openapi-types: 12.1.3
+      zod: 4.6.7
 
   fastify@5.12.8:
     dependencies:
@@ -7453,8 +7451,6 @@ snapshots:
       compress-commons: 6.0.2
       readable-stream: 4.8.0
 
-  zod-to-json-schema@3.25.2(zod@3.25.76):
-    dependencies:
-      zod: 3.25.76
-
   zod@3.25.76: {}
+
+  zod@4.6.7: {}

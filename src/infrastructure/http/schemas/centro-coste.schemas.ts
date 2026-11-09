@@ -1,16 +1,16 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 
 import { paginaSchema, uuidSchema } from './comunes.js';
 
 /** Cuerpo para crear un centro de coste (`RF-CC-1.1`). */
 export const crearCentroCosteBodySchema = z.object({
   codigo: z
-    .string({ required_error: 'El código es obligatorio' })
+    .string({ error: 'El código es obligatorio' })
     .trim()
     .min(1, 'El código es obligatorio')
     .max(50, 'El código no puede superar los 50 caracteres'),
   nombre: z
-    .string({ required_error: 'El nombre es obligatorio' })
+    .string({ error: 'El nombre es obligatorio' })
     .trim()
     .min(1, 'El nombre es obligatorio')
     .max(200, 'El nombre no puede superar los 200 caracteres'),

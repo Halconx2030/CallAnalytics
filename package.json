@@ -40,14 +40,13 @@
     "dotenv": "^18.0.10",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.8",
-    "fastify-type-provider-zod": "4.0.2",
+    "fastify-type-provider-zod": "7.0.0",
     "pino": "^9.3.2",
     "pino-pretty": "^11.2.2",
     "postgres": "^3.4.4",
     "ulid": "^2.3.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^3.23.8",
-    "zod-to-json-schema": "^3.23.0"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.47.2",

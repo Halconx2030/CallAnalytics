@@ -1,4 +1,4 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 
 import { formatoExportacionQuerySchema, paginaSchema, uuidSchema } from './comunes.js';
 
@@ -22,7 +22,7 @@ const fechaSchema = z
 /** Cuerpo para crear una línea (`RF-LIN-1.1`). */
 export const crearLineaBodySchema = z.object({
   numero: z
-    .string({ required_error: 'El número es obligatorio' })
+    .string({ error: 'El número es obligatorio' })
     .trim()
     .min(1, 'El número es obligatorio')
     .max(50, 'El número no puede superar los 50 caracteres'),

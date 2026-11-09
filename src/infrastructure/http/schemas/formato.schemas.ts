@@ -1,11 +1,11 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 
 import { paginaSchema, uuidSchema } from './comunes.js';
 
 /** Cuerpo para crear un formato (`RF-FMT-1.1`). */
 export const crearFormatoBodySchema = z.object({
   nombre: z
-    .string({ required_error: 'El nombre es obligatorio' })
+    .string({ error: 'El nombre es obligatorio' })
     .trim()
     .min(1, 'El nombre es obligatorio')
     .max(100, 'El nombre no puede superar los 100 caracteres'),
