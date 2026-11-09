@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import importPlugin from 'eslint-plugin-import';
+import sonarjs from 'eslint-plugin-sonarjs';
 import unusedImports from 'eslint-plugin-unused-imports';
 import prettierConfig from 'eslint-config-prettier';
 import path from 'node:path';
@@ -22,6 +23,7 @@ export default tseslint.config(
     },
     plugins: {
       import: importPlugin,
+      sonarjs,
       'unused-imports': unusedImports
     },
     rules: {
@@ -63,7 +65,9 @@ export default tseslint.config(
       'prefer-const': 'error',
       'no-var': 'error',
       'eqeqeq': ['error', 'always', { null: 'ignore' }],
-      'curly': ['error', 'all']
+      'curly': ['error', 'all'],
+      'complexity': ['error', 12],
+      'sonarjs/cognitive-complexity': ['error', 12]
     },
     settings: {
       'import/resolver': {

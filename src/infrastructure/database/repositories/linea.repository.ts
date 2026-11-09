@@ -1,10 +1,9 @@
-import { and, count, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
+import { and, count, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 
 import { LineaTelefonica } from '@domain/entities/LineaTelefonica.js';
 import { CostoMensual } from '@domain/value-objects/CostoMensual.js';
 
 import type {
-  ColumnaOrdenLinea,
   FiltrosLinea,
   LineaExportRow,
   LineaListado,
@@ -17,75 +16,18 @@ import { normalizarLimit } from '@application/ports/repositories/paginacion.js';
 
 import * as schema from '../schema/index.js';
 
-import {
-  codificarCursor,
-  decodificarCursor,
-  ilikeSeguro,
-  ordenKeyset,
-  predicadoKeyset,
-} from './cursor.js';
+import { codificarCursor, decodificarCursor, ordenKeyset, predicadoKeyset } from './cursor.js';
 import { mapearErrorPostgres } from './errors.js';
+import {
+  COLUMNAS_ORDEN,
+  construirCondicionesFiltroLinea,
+  proyeccionLinea,
+  valorCursorLinea,
+  valoresInsercionLinea,
+  type FilaLinea,
+} from './linea-query.helper.js';
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-
-/** Fila proyectada de la consulta de líneas (con datos del centro de coste). */
-interface FilaLinea {
-  id: string;
-  numero: string;
-  numeroOriginal: string;
-  proveedor: string;
-  centroCosteId: string;
-  centroCosteCodigo: string;
-  centroCosteNombre: string;
-  fechaAsignacion: string;
-  costoMensual: string;
-  tipoLinea: string;
-  empleado: string | null;
-  estado: string;
-  tipoUso: string;
-  version: number;
-  createdAt: Date;
-  updatedAt: Date;
-  deletedAt: Date | null;
-}
-
-/** Proyección compartida por el listado y la exportación. */
-const proyeccionLinea = {
-  id: schema.lineasTelefonicas.id,
-  numero: schema.lineasTelefonicas.numero,
-  numeroOriginal: schema.lineasTelefonicas.numeroOriginal,
-  proveedor: schema.lineasTelefonicas.proveedor,
-  centroCosteId: schema.lineasTelefonicas.centroCosteId,
-  centroCosteCodigo: schema.centrosCoste.codigo,
-  centroCosteNombre: schema.centrosCoste.nombre,
-  fechaAsignacion: schema.lineasTelefonicas.fechaAsignacion,
-  costoMensual: schema.lineasTelefonicas.costoMensual,
-  tipoLinea: schema.lineasTelefonicas.tipoLinea,
-  empleado: schema.lineasTelefonicas.empleado,
-  estado: schema.lineasTelefonicas.estado,
-  tipoUso: schema.lineasTelefonicas.tipoUso,
-  version: schema.lineasTelefonicas.version,
-  createdAt: schema.lineasTelefonicas.createdAt,
-  updatedAt: schema.lineasTelefonicas.updatedAt,
-  deletedAt: schema.lineasTelefonicas.deletedAt,
-};
-
-/** Columnas por las que se puede ordenar, con su tipo SQL para el cast del cursor. */
-const COLUMNAS_ORDEN: Record<ColumnaOrdenLinea, { expresion: SQL; tipo: string }> = {
-  numero: { expresion: sql`${schema.lineasTelefonicas.numero}`, tipo: 'text' },
-  proveedor: { expresion: sql`${schema.lineasTelefonicas.proveedor}`, tipo: 'text' },
-  // Columna del `INNER JOIN`: el keyset se evalúa sobre `centros_coste.codigo`.
-  centro_coste_codigo: { expresion: sql`${schema.centrosCoste.codigo}`, tipo: 'text' },
-  fecha_asignacion: {
-    expresion: sql`${schema.lineasTelefonicas.fechaAsignacion}`,
-    tipo: 'date',
-  },
-  costo_mensual: { expresion: sql`${schema.lineasTelefonicas.costoMensual}`, tipo: 'numeric' },
-  tipo_linea: { expresion: sql`${schema.lineasTelefonicas.tipoLinea}`, tipo: 'text' },
-  estado: { expresion: sql`${schema.lineasTelefonicas.estado}`, tipo: 'text' },
-  tipo_uso: { expresion: sql`${schema.lineasTelefonicas.tipoUso}`, tipo: 'text' },
-  created_at: { expresion: sql`${schema.lineasTelefonicas.createdAt}`, tipo: 'timestamptz' },
-};
 
 /** Implementación Drizzle del puerto {@link LineaRepository}. */
 export class DrizzleLineaRepository implements LineaRepository {
@@ -95,7 +37,7 @@ export class DrizzleLineaRepository implements LineaRepository {
     try {
       const filas = await this.db
         .insert(schema.lineasTelefonicas)
-        .values(this.valoresInsercion(linea))
+        .values(valoresInsercionLinea(linea))
         .returning();
 
       const fila = filas[0];
@@ -119,7 +61,7 @@ export class DrizzleLineaRepository implements LineaRepository {
       return await this.db.transaction(async (tx) => {
         const filas = await tx
           .insert(schema.lineasTelefonicas)
-          .values(lineas.map((linea) => this.valoresInsercion(linea)))
+          .values(lineas.map((linea) => valoresInsercionLinea(linea)))
           .returning();
 
         return filas.map((fila) => LineaTelefonica.reconstituirLineaTelefonica(fila));
@@ -182,9 +124,10 @@ export class DrizzleLineaRepository implements LineaRepository {
     const columna = opciones.sortColumn ?? 'created_at';
     const ascendente = (opciones.sortOrder ?? 'desc') === 'asc';
 
-    // Condiciones de filtro (sin el predicado de cursor): se reutilizan para contar el total.
-    const condicionesFiltroBase: SQL[] = [isNull(schema.lineasTelefonicas.deletedAt)];
-    condicionesFiltroBase.push(...this.condicionesFiltro(opciones));
+    const condicionesFiltroBase: SQL[] = [
+      isNull(schema.lineasTelefonicas.deletedAt),
+      ...construirCondicionesFiltroLinea(opciones),
+    ];
 
     const condiciones: SQL[] = [...condicionesFiltroBase];
 
@@ -220,7 +163,6 @@ export class DrizzleLineaRepository implements LineaRepository {
       )
       .limit(limit + 1);
 
-    // `SELECT COUNT(*)` separado con las mismas condiciones de filtro (sin ORDER BY ni LIMIT).
     const filasCount = await this.db
       .select({ count: count() })
       .from(schema.lineasTelefonicas)
@@ -245,7 +187,7 @@ export class DrizzleLineaRepository implements LineaRepository {
     const ultima = pagina[pagina.length - 1];
     const nextCursor =
       hasNextPage && ultima !== undefined
-        ? codificarCursor(this.valorCursor(columna, ultima), ultima.id, columna)
+        ? codificarCursor(valorCursorLinea(columna, ultima), ultima.id, columna)
         : null;
 
     return { items, nextCursor, hasNextPage, totalCount };
@@ -353,7 +295,7 @@ export class DrizzleLineaRepository implements LineaRepository {
       condiciones.push(isNull(schema.lineasTelefonicas.deletedAt));
     }
 
-    condiciones.push(...this.condicionesFiltro(filtros));
+    condiciones.push(...construirCondicionesFiltroLinea(filtros));
 
     const filas: FilaLinea[] = await this.db
       .select(proyeccionLinea)
@@ -390,135 +332,6 @@ export class DrizzleLineaRepository implements LineaRepository {
       .where(eq(schema.lineasTelefonicas.centroCosteId, centroCosteId));
 
     return filas[0]?.total ?? 0;
-  }
-
-  /** Valores de inserción derivados de la entidad. */
-  private valoresInsercion(linea: LineaTelefonica) {
-    return {
-      numero: linea.numero,
-      numeroOriginal: linea.numeroOriginal,
-      proveedor: linea.proveedor,
-      centroCosteId: linea.centroCosteId,
-      fechaAsignacion: linea.fechaAsignacion,
-      costoMensual: linea.costoMensual.aString(),
-      tipoLinea: linea.tipoLinea,
-      empleado: linea.empleado,
-      estado: linea.estado,
-      tipoUso: linea.tipoUso,
-      deletedAt: linea.deletedAt,
-      createdAt: linea.createdAt,
-      updatedAt: linea.updatedAt,
-    };
-  }
-
-  /** Traduce los 14 filtros de la spec a condiciones SQL. */
-  private condicionesFiltro(filtros: FiltrosLinea): SQL[] {
-    const condiciones: SQL[] = [];
-
-    if (filtros.numero !== undefined) {
-      condiciones.push(ilikeSeguro(sql`${schema.lineasTelefonicas.numero}`, filtros.numero));
-    }
-    if (filtros.proveedor !== undefined) {
-      condiciones.push(ilikeSeguro(sql`${schema.lineasTelefonicas.proveedor}`, filtros.proveedor));
-    }
-    if (filtros.centroCosteId !== undefined) {
-      condiciones.push(eq(schema.lineasTelefonicas.centroCosteId, filtros.centroCosteId));
-    }
-    if (filtros.centroCosteCodigo !== undefined) {
-      condiciones.push(ilikeSeguro(sql`${schema.centrosCoste.codigo}`, filtros.centroCosteCodigo));
-    }
-    if (filtros.centroCosteNombre !== undefined) {
-      condiciones.push(ilikeSeguro(sql`${schema.centrosCoste.nombre}`, filtros.centroCosteNombre));
-    }
-    if (filtros.centroCosteBusqueda !== undefined) {
-      const condicion = this.condicionBusquedaCentroCoste(filtros.centroCosteBusqueda);
-
-      if (condicion !== undefined) {
-        condiciones.push(condicion);
-      }
-    }
-    if (filtros.fechaAsignacion !== undefined) {
-      condiciones.push(eq(schema.lineasTelefonicas.fechaAsignacion, filtros.fechaAsignacion));
-    }
-    if (filtros.fechaDesde !== undefined) {
-      condiciones.push(
-        sql`${schema.lineasTelefonicas.fechaAsignacion} >= ${filtros.fechaDesde}::date`
-      );
-    }
-    if (filtros.fechaHasta !== undefined) {
-      condiciones.push(
-        sql`${schema.lineasTelefonicas.fechaAsignacion} <= ${filtros.fechaHasta}::date`
-      );
-    }
-    if (filtros.costoMin !== undefined) {
-      condiciones.push(
-        sql`${schema.lineasTelefonicas.costoMensual} >= ${filtros.costoMin}::numeric`
-      );
-    }
-    if (filtros.costoMax !== undefined) {
-      condiciones.push(
-        sql`${schema.lineasTelefonicas.costoMensual} <= ${filtros.costoMax}::numeric`
-      );
-    }
-    if (filtros.tipoLinea !== undefined) {
-      condiciones.push(eq(schema.lineasTelefonicas.tipoLinea, filtros.tipoLinea));
-    }
-    if (filtros.empleado !== undefined) {
-      condiciones.push(ilikeSeguro(sql`${schema.lineasTelefonicas.empleado}`, filtros.empleado));
-    }
-    if (filtros.estado !== undefined) {
-      condiciones.push(eq(schema.lineasTelefonicas.estado, filtros.estado));
-    }
-    if (filtros.tipoUso !== undefined) {
-      condiciones.push(eq(schema.lineasTelefonicas.tipoUso, filtros.tipoUso));
-    }
-
-    return condiciones;
-  }
-
-  /**
-   * Condición de búsqueda libre del centro de coste: el texto buscado aparece en el
-   * **código** o en el **nombre** del centro de coste (sin distinguir mayúsculas y
-   * minúsculas).
-   *
-   * Es la semántica del modo "todos los centros que coincidan" del buscador de la UI:
-   * una sola condición (OR) que agrupa las líneas de todos los centros coincidentes.
-   */
-  private condicionBusquedaCentroCoste(busqueda: string): SQL | undefined {
-    const texto = busqueda.trim();
-
-    if (texto === '') {
-      return undefined;
-    }
-
-    return or(
-      ilikeSeguro(sql`lower(${schema.centrosCoste.codigo})`, texto),
-      ilikeSeguro(sql`lower(${schema.centrosCoste.nombre})`, texto)
-    );
-  }
-
-  /** Valor de la columna de ordenamiento que se guarda en el cursor. */
-  private valorCursor(columna: ColumnaOrdenLinea, fila: FilaLinea): string {
-    switch (columna) {
-      case 'numero':
-        return fila.numero;
-      case 'proveedor':
-        return fila.proveedor;
-      case 'centro_coste_codigo':
-        return fila.centroCosteCodigo;
-      case 'fecha_asignacion':
-        return fila.fechaAsignacion;
-      case 'costo_mensual':
-        return String(fila.costoMensual);
-      case 'tipo_linea':
-        return fila.tipoLinea;
-      case 'estado':
-        return fila.estado;
-      case 'tipo_uso':
-        return fila.tipoUso;
-      case 'created_at':
-        return fila.createdAt.toISOString();
-    }
   }
 
   /**

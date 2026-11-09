@@ -1,4 +1,4 @@
-import { LineaTelefonica } from '@domain/entities/LineaTelefonica.js';
+import { LineaTelefonica, type CambiosLineaTelefonica } from '@domain/entities/LineaTelefonica.js';
 import {
   ConflictError,
   DuplicateError,
@@ -63,15 +63,8 @@ export class LineaService {
 
     const linea = LineaTelefonica.crearLineaTelefonica({
       numero: dto.numero,
-      ...(dto.numeroOriginal === undefined ? {} : { numeroOriginal: dto.numeroOriginal }),
-      ...(dto.proveedor === undefined ? {} : { proveedor: dto.proveedor }),
       centroCosteId: dto.centroCosteId,
-      ...(dto.fechaAsignacion === undefined ? {} : { fechaAsignacion: dto.fechaAsignacion }),
-      ...(dto.costoMensual === undefined ? {} : { costoMensual: dto.costoMensual }),
-      ...(dto.tipoLinea === undefined ? {} : { tipoLinea: dto.tipoLinea }),
-      ...(dto.empleado === undefined ? {} : { empleado: dto.empleado }),
-      ...(dto.estado === undefined ? {} : { estado: dto.estado }),
-      ...(dto.tipoUso === undefined ? {} : { tipoUso: dto.tipoUso }),
+      ...extraerAtributosOpcionales(dto),
     });
 
     const guardada = await this.lineas.crear(linea);
@@ -117,32 +110,15 @@ export class LineaService {
     dto: ActualizarLineaDto,
     versionEsperada?: number
   ): Promise<LineaDto> {
-    const linea = await this.lineas.buscarPorId(id);
-
-    if (linea === null) {
-      throw new NotFoundError('línea telefónica', id);
-    }
-
-    if (versionEsperada !== undefined && versionEsperada !== linea.version) {
-      throw new ConflictError(
-        `La línea fue modificada por otra persona (versión actual: ${linea.version}).`
-      );
-    }
+    const linea = await this.obtenerParaEdicion(id, versionEsperada);
 
     if (dto.centroCosteId !== undefined && dto.centroCosteId !== linea.centroCosteId) {
       await this.exigirCentroCoste(dto.centroCosteId);
     }
 
     const actualizada = linea.actualizar({
-      ...(dto.numeroOriginal === undefined ? {} : { numeroOriginal: dto.numeroOriginal }),
-      ...(dto.proveedor === undefined ? {} : { proveedor: dto.proveedor }),
       ...(dto.centroCosteId === undefined ? {} : { centroCosteId: dto.centroCosteId }),
-      ...(dto.fechaAsignacion === undefined ? {} : { fechaAsignacion: dto.fechaAsignacion }),
-      ...(dto.costoMensual === undefined ? {} : { costoMensual: dto.costoMensual }),
-      ...(dto.tipoLinea === undefined ? {} : { tipoLinea: dto.tipoLinea }),
-      ...(dto.empleado === undefined ? {} : { empleado: dto.empleado }),
-      ...(dto.estado === undefined ? {} : { estado: dto.estado }),
-      ...(dto.tipoUso === undefined ? {} : { tipoUso: dto.tipoUso }),
+      ...extraerAtributosOpcionales(dto),
     });
 
     const resultado = await this.lineas.actualizar(actualizada, linea.version);
@@ -156,31 +132,13 @@ export class LineaService {
 
   /**
    * Cambia el estado de una línea (RF-LIN-1.6).
-   *
-   * Poner `baja` hace la baja lógica (`deleted_at`), y la operación es idempotente: si la
-   * línea ya está en ese estado no se toca la base de datos.
-   *
-   * @param versionEsperada versión que el cliente cree tener (cabecera `If-Match`); si no
-   * coincide con la almacenada se responde con conflicto (409) y **no** se aplica el cambio
-   * (RF-OPT-1.3). Si no se indica, la operación no verifica la versión.
    */
   async cambiarEstado(
     id: string,
     estado: LineaTelefonica['estado'],
     versionEsperada?: number
   ): Promise<LineaDto> {
-    const linea = await this.lineas.buscarPorId(id);
-
-    if (linea === null) {
-      throw new NotFoundError('línea telefónica', id);
-    }
-
-    if (versionEsperada !== undefined && versionEsperada !== linea.version) {
-      throw new ConflictError(
-        `La línea fue modificada por otra persona (versión actual: ${linea.version}).`
-      );
-    }
-
+    const linea = await this.obtenerParaEdicion(id, versionEsperada);
     const cambiada = linea.cambiarEstado(estado);
 
     if (cambiada === linea) {
@@ -198,10 +156,6 @@ export class LineaService {
 
   /**
    * Da de baja una línea (baja lógica, `RF-LIN-1.8`) comprobando la versión esperada.
-   *
-   * Es el caso de uso del `DELETE /api/v1/lineas/:id`: la cabecera `If-Match` se propaga
-   * hasta la escritura, que se hace de forma **condicional por versión**
-   * (`UPDATE ... WHERE id = $id AND version = $versionEsperada`).
    */
   async eliminar(id: string, versionEsperada?: number): Promise<LineaDto> {
     return this.cambiarEstado(id, 'baja', versionEsperada);
@@ -209,9 +163,6 @@ export class LineaService {
 
   /**
    * Cambia el estado de varias líneas en una transacción (RF-LIN-1.7).
-   *
-   * Las líneas que ya están en el estado pedido se cuentan como `ignoradas` (idempotencia,
-   * Q3 de la spec) y las que no existen como `fallidas`.
    */
   async cambiarEstadoMasivo(
     ids: string[],
@@ -246,6 +197,23 @@ export class LineaService {
     }));
   }
 
+  /** Carga la línea por id y verifica la versión optimista esperada si fue informada. */
+  private async obtenerParaEdicion(id: string, versionEsperada?: number): Promise<LineaTelefonica> {
+    const linea = await this.lineas.buscarPorId(id);
+
+    if (linea === null) {
+      throw new NotFoundError('línea telefónica', id);
+    }
+
+    if (versionEsperada !== undefined && versionEsperada !== linea.version) {
+      throw new ConflictError(
+        `La línea fue modificada por otra persona (versión actual: ${linea.version}).`
+      );
+    }
+
+    return linea;
+  }
+
   /** Verifica que el centro de coste exista; si no, error de clave foránea (400). */
   private async exigirCentroCoste(centroCosteId: string): Promise<void> {
     const centro = await this.centrosCoste.buscarPorId(centroCosteId);
@@ -254,4 +222,20 @@ export class LineaService {
       throw new ForeignKeyError('centroCosteId', 'El centro de coste indicado no existe.');
     }
   }
+}
+
+/** Construye un objeto con solo los campos opcionales definidos en el DTO. */
+function extraerAtributosOpcionales(
+  dto: ActualizarLineaDto
+): Omit<CambiosLineaTelefonica, 'centroCosteId'> {
+  return {
+    ...(dto.numeroOriginal === undefined ? {} : { numeroOriginal: dto.numeroOriginal }),
+    ...(dto.proveedor === undefined ? {} : { proveedor: dto.proveedor }),
+    ...(dto.fechaAsignacion === undefined ? {} : { fechaAsignacion: dto.fechaAsignacion }),
+    ...(dto.costoMensual === undefined ? {} : { costoMensual: dto.costoMensual }),
+    ...(dto.tipoLinea === undefined ? {} : { tipoLinea: dto.tipoLinea }),
+    ...(dto.empleado === undefined ? {} : { empleado: dto.empleado }),
+    ...(dto.estado === undefined ? {} : { estado: dto.estado }),
+    ...(dto.tipoUso === undefined ? {} : { tipoUso: dto.tipoUso }),
+  };
 }

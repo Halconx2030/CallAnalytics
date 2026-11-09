@@ -73,63 +73,76 @@ const REGEX_CEROS_INICIALES = /^0+/;
  * Es idempotente: normalizar un número ya normalizado lo devuelve igual.
  */
 export function normalizePhone(raw: string): NumeroNormalizado {
+  const digitos = extraerDigitosNacionales(raw);
+  const tipo = clasificarDigitosNacionales(digitos);
+
+  if (tipo === null) {
+    throw new InvalidPhoneNumberError(raw);
+  }
+
+  return { normalized: `+${PREFIJO_PAIS}${digitos}`, tipo };
+}
+
+/** Limpia separadores, ceros iniciales y prefijo país (`+56` o `56`) devolviendo los dígitos nacionales. */
+function extraerDigitosNacionales(raw: string): string {
   if (typeof raw !== 'string') {
     throw new InvalidPhoneNumberError(raw);
   }
 
   const texto = raw.trim();
-  if (texto === '') {
+  const tienePrefijoMas = texto.startsWith('+');
+  const cuerpo = tienePrefijoMas ? texto.slice(1) : texto;
+
+  if (cuerpo === '' || !REGEX_CARACTERES_PERMITIDOS.test(cuerpo)) {
     throw new InvalidPhoneNumberError(raw);
   }
 
-  const tienePrefijoPais = texto.startsWith('+');
-  const cuerpo = tienePrefijoPais ? texto.slice(1) : texto;
-
-  if (!REGEX_CARACTERES_PERMITIDOS.test(cuerpo)) {
+  const digitosCrudos = cuerpo.replace(REGEX_SEPARADORES, '');
+  if (digitosCrudos === '') {
     throw new InvalidPhoneNumberError(raw);
   }
 
-  let digitos = cuerpo.replace(REGEX_SEPARADORES, '');
-  if (digitos === '') {
+  return tienePrefijoMas
+    ? removerPrefijoConSignoMas(digitosCrudos, raw)
+    : removerPrefijoSinSignoMas(digitosCrudos);
+}
+
+/** Remueve el prefijo `56` obligatorio cuando el número original empezaba con `+`. */
+function removerPrefijoConSignoMas(digitos: string, raw: string): string {
+  if (!digitos.startsWith(PREFIJO_PAIS)) {
     throw new InvalidPhoneNumberError(raw);
   }
+  return quitarCerosIniciales(digitos.slice(PREFIJO_PAIS.length));
+}
 
-  if (tienePrefijoPais) {
-    if (!digitos.startsWith(PREFIJO_PAIS)) {
-      throw new InvalidPhoneNumberError(raw);
-    }
-    digitos = digitos.slice(PREFIJO_PAIS.length);
-  } else {
-    digitos = quitarCerosIniciales(digitos);
+/** Remueve ceros iniciales y el prefijo `56` opcional cuando no había signo `+`. */
+function removerPrefijoSinSignoMas(digitos: string): string {
+  const sinCeros = quitarCerosIniciales(digitos);
+  const esLargoConPrefijoPais =
+    (sinCeros.length === 11 || sinCeros.length === 12) && sinCeros.startsWith(PREFIJO_PAIS);
 
-    // Prefijo país sin `+`: solo se quita si el resto calza con un largo chileno válido.
-    const esLargoConPrefijoPais =
-      (digitos.length === 11 || digitos.length === 12) && digitos.startsWith(PREFIJO_PAIS);
+  const nacionales = esLargoConPrefijoPais ? sinCeros.slice(PREFIJO_PAIS.length) : sinCeros;
+  return quitarCerosIniciales(nacionales);
+}
 
-    if (esLargoConPrefijoPais) {
-      digitos = digitos.slice(PREFIJO_PAIS.length);
-    }
-  }
-
-  // Cubre casos como "+560 9 1234 5678" y "056 9 1234 5678".
-  digitos = quitarCerosIniciales(digitos);
-
+/** Determina si los dígitos nacionales corresponden a un móvil o fijo chileno válido. */
+function clasificarDigitosNacionales(digitos: string): TipoLinea | null {
   if (digitos.length === MAX_DIGITOS_MOVIL && digitos.startsWith('9')) {
-    return { normalized: `+${PREFIJO_PAIS}${digitos}`, tipo: 'movil' };
+    return 'movil';
   }
 
   if (digitos.length === MAX_DIGITOS_FIJO_SANTIAGO && digitos.startsWith(PREFIJO_FIJO_SANTIAGO)) {
-    return { normalized: `+${PREFIJO_PAIS}${digitos}`, tipo: 'fijo' };
+    return 'fijo';
   }
 
   if (
     digitos.length === MAX_DIGITOS_FIJO_REGION &&
     PREFIJOS_FIJOS_REGIONES.includes(digitos.slice(0, 2))
   ) {
-    return { normalized: `+${PREFIJO_PAIS}${digitos}`, tipo: 'fijo' };
+    return 'fijo';
   }
 
-  throw new InvalidPhoneNumberError(raw);
+  return null;
 }
 
 function quitarCerosIniciales(digitos: string): string {
